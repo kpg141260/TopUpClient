@@ -120,6 +120,15 @@ class UARTEventTests(unittest.TestCase):
         self.consume()
         self.log.info.assert_called_once_with(event)
 
+    def test_rejected_frame_is_logged_on_core0_with_original_bytes(self):
+        data = b'bad\xff*0000\n'
+        self.push(self.producer, {'uart_rx_error': data})
+        self.consume()
+        self.log.error.assert_called_once_with({
+            'msg': f'UART frame rejected (CRC/format): {data!r}',
+            'lvl': LEVELS.ERROR, 'ts': 'Core 0 timestamp',
+        })
+
     def test_worker_lifecycle_and_error_events_require_no_logger(self):
         shared = {'stop': False, 'pause': False}
         errors = []

@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.5.0.3"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
@@ -223,6 +223,10 @@ class AsyncHandlers:
                                 data = event.pop('uart_tx')
                                 event['lvl'] = self.dbg_lvls.PRINT
                                 event['msg'] = f'{self._tc.info}Writing: {self._tc.par}{data}{self._tc.end}'
+                            elif 'uart_rx_error' in event:
+                                data = event.pop('uart_rx_error')
+                                event['lvl'] = self.dbg_lvls.ERROR
+                                event['msg'] = f'UART frame rejected (CRC/format): {data!r}'
                             if 'ts' not in event:
                                 event['ts'] = self._log.get_time_stamp()
                             if   event['lvl'] == self.dbg_lvls.OFF:      return
