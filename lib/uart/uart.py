@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.20"
+__VERSION__ = "0.5.0.3"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, B012
 # -*- coding: utf-8 -*-
 import  gc
@@ -34,6 +34,7 @@ class UARTComms (UARTHelpersClient):
         self._txt_launch    = 'launched...'
         self._txt_rtc_sync  = 'RTC sync'
         self._txt_success   = 'successfully'
+        self._cnf           = None
 
         try:
             self._log       = logger

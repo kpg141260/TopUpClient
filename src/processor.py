@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.5.0.2"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 ########## CLASS IMPORTS ##########
 import sys
@@ -68,7 +69,7 @@ class Processor (CommandHandlers, AsyncHandlers):
             self._pin_ready         = Pin (config.get('pin_ready', 4), Pin.IN, Pin.PULL_DOWN)
             self._challenge:    str = config.get('challenge_phrase', 'ping')
             self._response:     str = config.get('challenge_response', 'pong')
-            self._my_info:      str = f'{config.get('self_name', 'PTCC')} ({self._v_prc})'
+            self._my_info:      str = name
             self._fn_cmd_dict:  str = config['files']['cmd_dict']
             self._mx_fail_tsks: int = int (config.get('max_failed_task_count', 3))
         except (KeyError, ValueError, OSError) as ex:
@@ -106,10 +107,10 @@ class Processor (CommandHandlers, AsyncHandlers):
                                               help_fcnts=help_fncs)
             self._class_map.setdefault ('TankController', self._tank_ctrl)
             self._uart = UARTComms (logger=logger, 
-                                      version=version,
                                       file_io=file_io, 
                                       cnf_fn=config['files']['comms'], 
                                       tc=self._tc, 
+                                      name=self._my_info,
                                       event_buffer=self._ev_buffer)
             self._mem_threshold = (gc.mem_free() + gc.mem_alloc()) // 4
             gc.threshold (self._mem_threshold)
