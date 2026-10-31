@@ -1,0 +1,83 @@
+{
+    "sensors":{
+        "pump": {
+            "name": "Pump",
+            "pin": 16,
+            "pull": 2,
+            "active_state": true
+        },
+        "resv_top": {
+            "name": "Reservoir Top",
+            "pin": 17,
+            "pull": 1,
+            "active_state": false
+        },
+        "resv_low": {
+            "name": "Reservoir Bottom",
+            "pin": 15,
+            "pull": 1,
+            "active_state": false
+        },
+        "sump": {
+            "name": "Sump",
+            "pin": 14,
+            "pull": 1,
+            "active_state": true
+        }
+    },
+    "relays": {
+        "valve": {
+            "id": 0,
+            "pin": 10,
+            "active_state": false,
+            "initial_state": false,
+            "name": "Valve",
+            "block_time": 3000,
+            "enabled": true
+        },
+        "pump": {
+            "id": 1,
+            "pin": 11,
+            "active_state": false,
+            "initial_state": false,
+            "name": "Pump",
+            "block_time": 5000,
+            "enabled": true
+        },
+        "chiller": {
+            "id": 2,
+            "pin": 12,
+            "active_state": false,
+            "initial_state": false,
+            "name": "Chiller",
+            "block_time": 5000,
+            "enabled": true
+        }
+    },
+    "tank_cnf": {
+        "print_progress": false, 
+        "detect_sensor_errors": false,
+        "use_refill": false,
+        "refill_max_time": 1920,
+        "t_target": 25.4,
+        "t_hyst_gap": 0.3,
+        "t_trend_slope_max": 0.3,
+        "t_trend_min": -2.0,
+        "t_trend_max": 2.0,
+        "t_min": 23.0,
+        "t_max": 30.0
+    },
+    "ds18x20": {
+        "pin": 22,
+        "precision": 12,
+        "index": 0,
+        "min_count": 10,
+        "max_count": 100,
+        "fc_period": 60,
+        "unit": "C",
+        "kelvin": 273.15,
+        "enabled": false
+    },
+    "temp_unit_char": "C",
+    "text_encoding": "utf-8"
+}

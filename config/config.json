@@ -1,0 +1,37 @@
+{
+    "encoding": "utf-8",
+    "show_mem_info": false,
+    "temp_unit": "Celsius",
+    "temp_degree_char": "0xB0",
+    "temp_unit_char": "C",
+    "truncate_log_file": false,
+    "max_log_size": 25000,
+    "ev_buf_size": 10,
+    "rx_buf_size": 10,
+    "tx_buf_size": 20,
+    "self_name": "PTCC",
+    "get_time": false,
+    "con_retry_max": 60,
+    "con_retry_delay": 10,
+    "pin_ready": 4,
+    "challenge_phrase": "ping",
+    "challenge_response": "pong",
+    "max_failed_task_count": 3,
+    "files": {
+        "async_tasks": "/config/async_tasks.json",
+        "comms":       "/config/comms.json",
+        "cmd_dict":    "/config/cmd_dict.json",
+        "tank_config": "/config/tank_config.json",
+        "log_config":  "/config/log_config.json",
+        "log_file":    "/logs/event.log"
+    },
+    "pins":
+    {
+        "led": 21,
+        "adc": 4
+    },
+    "tank": {"sump":null, "reservoir": null, "rtop":null, "rbot":null},
+    "dvcs": {"pump":null, "valve":null, "chiller":null}, 
+    "sys":  {"client": {"mem_f": 0, "mem_a": 0, "c_tmp": 0.0}, "server": {"mem_f": 0, "mem_a": 0, "c_tmp": 0.0}},
+    "tmp":  {"tank": 0.0, "slope": 0.0, "trend": 0.0, "elapsed": 0, "cnt": 0, "fc_temp": 0.0, "fc_period": 0, "target": 0.0, "max": 0.0, "min": 0.0, "hyst": 0.0}    
+}

@@ -1,0 +1,8 @@
+{
+    "tank":   ["state", "chiller", "pump", "valve", "refill", "temp", "trend", "unit", "all", "measure"],
+    "task":   ["run", "pause", "resume", "interval", "stop", "restart", "state"],
+    "system": ["debug", "exit", "memory", "state", "version"],
+    "uart":   ["event", "msg", "state", "sim", "thread", "buffer", "encrypt", "decrypt"],
+    "srvr":   ["cmd", "req", "upd", "msg"],
+    "prefix": "_hdlr_"
+}

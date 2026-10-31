@@ -1,0 +1,23 @@
+{  
+    "uart_id": 0,
+    "baud_rate": 76800,
+    "stop_bits": 1,
+    "data_bits": 8,
+    "parity": "None",
+    "pin_tx": 0,
+    "pin_rx": 1,
+    "pin_cts": 2,
+    "pin_rts": 3,
+    "poll_freq": 1,
+    "hs_interval": 30,
+    "hs_rcv_delay": 0.2,
+    "hs_rcv_max_cnt": 100,
+    "wd_interval": 10,
+    "max_wd_cnt": 10,
+    "encoding": "utf-8",
+    "uart_buf_size": 512,
+    "uart_interval": 0.01,
+    "uart_thread_interval": 0.5,
+    "ev_buf_size": 10,
+    "crc": true
+}

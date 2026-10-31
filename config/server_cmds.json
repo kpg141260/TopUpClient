@@ -1,0 +1,8 @@
+{
+    "cmd": {
+        "task":   ["action", "name", ["params"]],
+        "uart":   ["action", ["params"]],
+        "tank":   ["action", "target", ["params"]],
+        "system": ["action", "target", ["params"]]
+    }
+}

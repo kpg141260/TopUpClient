@@ -1,0 +1,94 @@
+{
+    "project": {
+        "name": "TopUp",
+        "main_file": "ptcc_main.py",
+        "build_info": {
+            "major": 0,
+            "minor": 1,
+            "patch": 1,
+            "time": "162049",
+            "build": 23
+        }
+    },
+    "ptcc_main.py": {
+        "build": 12
+    },
+    "lib/common/ansi_esc.py": {
+        "build": 1
+    },
+    "lib/common/config.py": {
+        "build": 1
+    },
+    "lib/common/cipher.py": {
+        "build": 2
+    },
+    "lib/common/file_io.py": {
+        "build": 6
+    },
+    "lib/common/common.py": {
+        "build": 1
+    },
+    "lib/common/regex_filters.py": {
+        "build": 1
+    },
+    "lib/common/version.py": {
+        "build": 2
+    },
+    "lib/logger/logger.py": {
+        "build": 6
+    },
+    "lib/logger/logHandlers.py": {
+        "build": 3
+    },
+    "lib/logger/logFormatters.py": {
+        "build": 4
+    },
+    "lib/updater/update.py": {
+        "build": 2
+    },
+    "lib/updater/updater_client.py": {
+        "build": 1
+    },
+    "lib/updater/updater_server.py": {
+        "build": 1
+    },
+    "lib/uart/uart_full_duplex.py": {
+        "build": 13
+    },
+    "lib/uart/uart_helpers_client.py": {
+        "build": 13
+    },
+    "lib/uart/uart_thread.py": {
+        "build": 15
+    },
+    "lib/uart/uart.py": {
+        "build": 15
+    },
+    "src/devices.py": {
+        "build": 7
+    },
+    "src/processor.py": {
+        "build": 23
+    },
+    "src/tank_controller.py": {
+        "build": 10
+    },
+    "src/task_manager.py": {
+        "build": 9
+    },
+    "lib/common/cipher.mpy": {
+        "build": 4
+    },
+    "lib/common/helpers.py": {
+        "build": 3
+    },
+    "lib/logger/aio.mpy": {
+        "build": 1
+    },
+    "src/async_handlers.py": {
+        "build": 7
+    },
+    "src/cmd_handlers.py": {
+        "build": 6
+    }
+}
