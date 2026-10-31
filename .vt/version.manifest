@@ -46,11 +46,11 @@
         "mtime": "2026-06-09 10:15:28"
     },
     "lib/uart/uart_helpers_client.py": {
-        "build": 1,
-        "hash": "a6804bcf294ff8ecf62613217c428a62583bb30f14d7a61784d073d92ef17547",
+        "build": 3,
+        "hash": "b91a0a8dc73e3779806788e4052a04743c6f7e042622f62f64db03c9f4fda77d",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-06-12 20:00:09"
+        "mtime": "2026-10-31 17:32:16"
     },
     "lib/uart/uart_thread.py": {
         "build": 2,
@@ -81,11 +81,11 @@
         "mtime": "2026-05-05 13:22:30"
     },
     "lib/uart/uart.py": {
-        "build": 2,
-        "hash": "d03a573e9afc96a31771030782024f0f31139dda34dc51fc03b00b9de90c752b",
+        "build": 3,
+        "hash": "e95b9afdae629df0209e36d0aed3ff938c87859679f7f4bda92c45b87115f3ae",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-10-30 18:48:53"
+        "mtime": "2026-10-31 17:06:58"
     },
     "lib/common/helpers.mpy": {
         "build": 1,
@@ -95,11 +95,11 @@
         "mtime": "2026-05-05 13:22:30"
     },
     "src/async_handlers.py": {
-        "build": 1,
-        "hash": "5e13765138475253fc37972e362ef68917615fe4b09e461e7e8c9b7eed8c8a76",
+        "build": 2,
+        "hash": "89e4d01b647b9b8b885d267c83ebc7475224d3ed3dcb7bb6928233cc1009b18f",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-06-12 20:00:09"
+        "mtime": "2026-10-31 17:32:16"
     },
     "lib/common/file_io.py": {
         "build": 1,
@@ -151,18 +151,18 @@
         "mtime": "2026-06-12 19:39:37"
     },
     "src/processor.py": {
-        "build": 1,
-        "hash": "df4491659d27c543d46df13c65915b382f872b3741d36ca5940e2b5d828007bc",
+        "build": 2,
+        "hash": "5d7cd1e64fe38b4b41d1004a6db672fef566dff982972b9e78d7c6be55bad978",
         "has_changes": true,
         "ctime": "2026-05-05 13:22:57",
-        "mtime": "2026-05-05 13:22:57"
+        "mtime": "2026-10-31 17:06:58"
     },
     "lib/uart/uart_full_duplex.py": {
-        "build": 2,
-        "hash": "47e530627186b2b669f2b85e6ade0260ebfd8bf0b5dfed773a382481f566a4b3",
+        "build": 3,
+        "hash": "58a7516bb393ccd3bfe0a9d0ed846c3a691e5596e63cb5a9a8518e31d509156c",
         "has_changes": true,
         "ctime": "2026-06-12 20:35:39",
-        "mtime": "2026-10-30 18:37:17"
+        "mtime": "2026-10-31 17:32:16"
     },
     "lib/logger/aio.py": {
         "build": 1,

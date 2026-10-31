@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.5.0.2"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
@@ -218,6 +219,12 @@ class AsyncHandlers:
                     while len (self._ev_buffer) > 0:
                         event = self._ev_buffer.get()
                         if isinstance(event, dict) and event !={}:
+                            if 'uart_tx' in event:
+                                data = event.pop('uart_tx')
+                                event['lvl'] = self.dbg_lvls.PRINT
+                                event['msg'] = f'{self._tc.info}Writing: {self._tc.par}{data}{self._tc.end}'
+                            if 'ts' not in event:
+                                event['ts'] = self._log.get_time_stamp()
                             if   event['lvl'] == self.dbg_lvls.OFF:      return
                             elif event['lvl'] == self.dbg_lvls.DEBUG:    self._log.debug   (event)
                             elif event['lvl'] == self.dbg_lvls.INFO:     self._log.info    (event)
@@ -226,6 +233,7 @@ class AsyncHandlers:
                             elif event['lvl'] == self.dbg_lvls.CRITICAL: self._log.critical(event)
                             elif event['lvl'] == self.dbg_lvls.TRACE:    self._log.trace   (event)
                             elif event['lvl'] == self.dbg_lvls.PRINT:    self._log.aprint  (event['msg'])
+                        await asyncio.sleep(0)
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)

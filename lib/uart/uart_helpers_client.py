@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.5.0.3"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
@@ -17,6 +17,7 @@ class UARTHelpersClient (UARTthread):
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             super().__init__(logger, cnf, tc)
+            self._uart._push_event = self.__push_event
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
         except (Exception) as ex:
             self._log.critical ({'msg': f'$p${__VERSION__}$p$ {self._txt_construct} {self._txt_failed}', 'cls': __class__})
@@ -66,7 +67,6 @@ class UARTHelpersClient (UARTthread):
     # Push event to event buffer
     def __push_event (self, event: dict):
         if self._ev_buffer is None: return
-        event['ts'] = event.get('ts', self._log.get_time_stamp())
         self._ev_buffer.put (event)
 
     def event_simulation (self, ev_buf_size: int):

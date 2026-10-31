@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.12"
+__VERSION__ = "0.5.0.3"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import _thread
@@ -19,6 +19,7 @@ class FullDuplexUART:
         self._txt_success   = 'successfully'
         try:
             self._log          = logger
+            self._push_event   = None
             self._tc           = tc
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             self._cnf          = cnf
@@ -132,7 +133,12 @@ class FullDuplexUART:
                 return
             if self.tx_read_ptr == self.tx_write_ptr or self.cts_pin.value() != 0:
                 return
-            self._log.aprint (f'{self._tc.info}Writing: {self._tc.par}{self.tx_buffer [self.tx_read_ptr:self.tx_write_ptr]}{self._tc.end}')
+            if self._push_event is not None:
+                if self.tx_write_ptr >= self.tx_read_ptr:
+                    data = bytes(self.tx_buffer[self.tx_read_ptr:self.tx_write_ptr])
+                else:
+                    data = bytes(self.tx_buffer[self.tx_read_ptr:] + self.tx_buffer[:self.tx_write_ptr])
+                self._push_event({'uart_tx': data})
             while self.tx_read_ptr != self.tx_write_ptr:
                 if self.cts_pin.value() != 0:
                     break
