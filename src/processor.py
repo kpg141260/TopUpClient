@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.5.0.3"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 ########## CLASS IMPORTS ##########
@@ -66,7 +66,6 @@ class Processor (CommandHandlers, AsyncHandlers):
             self.state.setdefault ('sys',  config.get('sys').copy())
             self.state.setdefault ('dvcs', config.get('dvcs').copy())
             self.state.setdefault ('tmp',  config.get('tmp').copy())
-            self._pin_ready         = Pin (config.get('pin_ready', 4), Pin.IN, Pin.PULL_DOWN)
             self._challenge:    str = config.get('challenge_phrase', 'ping')
             self._response:     str = config.get('challenge_response', 'pong')
             self._my_info:      str = name
@@ -232,9 +231,7 @@ class Processor (CommandHandlers, AsyncHandlers):
         elif key == 'req':
             if cmd['req'].get('act') == 'exit':
                 self._log.warning ({'msg': f'Device $v${self._uart.device_name()}$v$ requested exit'})
-                self.task_manager.cancel_task (task_name='as_uart_watchdog')
-                self.task_manager.cancel_task (task_name='as_uart_cmd')
-                self._uart.set_connection_state (False)
+                self._uart.disconnect('peer requested exit')
             else:
                 request = [target, device, action, data]
                 asyncio.create_task(self._process_command(*request))

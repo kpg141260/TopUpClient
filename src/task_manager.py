@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.5.0.6"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
@@ -55,6 +56,7 @@ class TaskManager:
             self.task_register: dict   = task_register
             self.cb_shutdown: callable = cb_shutdown    # type: ignore
             self._shutdown: bool       = False
+            self._control_tasks = []
             self.__is_alive: bool      = False
             self.txt_task: str         = 'Task'
             self.txt_tasks: str        = 'asynchronous tasks'
@@ -198,40 +200,53 @@ class TaskManager:
 
 ########## TASK CONTROL METHODS ##########
     # Wrapper function for __cancel_task
-    def cancel_task (self, task_name: str=None, stop: bool=False): # type: ignore
-        asyncio.run (self.__cancel_task (task_name=task_name, stop=stop))
-    async def __cancel_task (self, task_name: str=None, stop: bool=False): # type: ignore
-        if task_name is None:
-            raise ValueError ('Task name must be provided')
+    def _run_control(self, operation):
         try:
-            task = self.task_register[task_name]['task']
-            if task and self.task_register[task_name]['id'] is not 0:
-                try:
-                    task.cancel() # Cancel the task
-                    await task
-                except asyncio.CancelledError:
-                    # Make sure the task has cancelled
-                    while not task.done():
-                        await asyncio.sleep (0.1)
-                    state = self.State.STOPPED if stop else self.State.COMPLETED
-                    self.task_register[task_name]['state'] = state
-                    # Indicate in the task register that the task has been cancelled
-                    self.task_register[task_name]['id']    = 0
-                    self.task_register[task_name]['task']  = None
-                    color = self.get_state_color (state)
-                    # Once the while loop is done, the task is cancelled
-                    self._log.info ({'msg': f'$f${task_name}$f$ $i${id(task)}$i$ {color}has {self.S2T[state]}', 'acc': self._tc.success})
-                    gc.collect()
-        except (ValueError, KeyError):
-            self.__log_task_not_found (task_name=task_name, fnc='cancel_task')
+            current = asyncio.current_task()
+        except RuntimeError:
+            current = None
+        if current is None:
+            return asyncio.run(operation)
+        self._control_tasks = [task for task in self._control_tasks if not task.done()]
+        pending = asyncio.create_task(operation)
+        self._control_tasks.append(pending)
+        return pending
+
+    def cancel_task(self, task_name: str | None = None, stop: bool = False):
+        return self._run_control(self.cancel_task_async(task_name, stop))
+
+    async def cancel_task_async(self, task_name: str | None = None, stop: bool = False):
+        await self.__cancel_task(task_name=task_name, stop=stop)
+    async def __cancel_task(self, task_name: str | None = None, stop: bool = False):
+        if task_name is None:
+            return
+        try:
+            record = self.task_register[task_name]
+            task = record['task']
+            if task is None:
+                return
+            if not task.done():
+                task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            if record.get('task') is not task:
+                return
+            state = self.State.STOPPED if stop else self.State.CANCELLED
+            record.update(state=state, id=0, task=None)
+            self._log.info({'msg': 'Task %s %s' % (task_name, self.S2T[state])})
+        except KeyError:
+            self.__log_task_not_found(task_name=task_name, fnc='cancel_task')
         except Exception as ex:
-            self._log.trace ({'exc': ex, 'cls': __class__, 'fnc': 'cancel_task'})
+            self._log.trace({'exc': ex, 'cls': __class__, 'fnc': 'cancel_task'})
     # Cancel all tasks
     # This function is called when the program is shutting down
-    def cancel_all_tasks (self):
-        for task_name in self.task_register.keys ():
-            if self.task_register[task_name]['id'] != 0 and self.task_register[task_name]['state'] == self.State.RUNNING:
-                self.cancel_task (task_name=task_name)
+    def cancel_all_tasks(self):
+        for name, record in self.task_register.items():
+            task = record.get('task')
+            if task is not None and not task.done():
+                self.cancel_task(task_name=name)
     # Pause a task by ID or task_name
     def pause_task (self, task_name: str):
         if task_name in self.task_register and self.task_register[task_name]['state'] == self.State.RUNNING:
@@ -267,15 +282,13 @@ class TaskManager:
         while delay > 0 and self.task_register[task_name]['id'] != 0:
             delay -= interval
             await asyncio.sleep(1)  # Non-blocking sleep
-        self.add_task(name=task_name)
+        if not self._shutdown:
+            self.add_task(name=task_name)
         return
     # Async wrapper to Restart a task by ID or task_name
-    def restart_task (self, task_name: str=None): # type: ignore
-        try:
-            loop = asyncio.get_event_loop()
-            asyncio.create_task(self.restart_task_async(task_name=task_name))
-        except RuntimeError:
-            asyncio.run (self.restart_task_async(task_name=task_name))
+    def restart_task(self, task_name: str | None = None):
+        if task_name is not None:
+            return self._run_control(self.restart_task_async(task_name))
 ########## TASK MISCELLANEOUS METHODS ##########
     # Check if all tasks are done
     # This function is called when the program is shutting down
@@ -480,11 +493,24 @@ class TaskManager:
         # Avoid cascading shutdown
         if not self._shutdown:
             self._shutdown = True
-    def shutdown (self):
+    def shutdown(self):
         if self._shutdown:
+            for record in self.task_register.values():
+                task = record.get('task')
+                if task is not None and not task.done():
+                    raise RuntimeError('Await task shutdown before destroying resources')
             self.__is_alive = False
-            self.cancel_all_tasks()
-            self._log.info ({'msg': f'$a$has terminated$a$', 'cls': __class__, 'acc': self._tc.success})
+            self._log.info({'msg': 'Task manager terminated', 'cls': __class__})
+
+    async def shutdown_async(self):
+        self._shutdown = True
+        for name, record in self.task_register.items():
+            task = record.get('task')
+            if task is not None and not task.done() and task is not asyncio.current_task():
+                await self.cancel_task_async(task_name=name, stop=True)
+        for pending in self._control_tasks:
+            await pending
+        self._control_tasks.clear()
     async def tm_main (self):
         _fnc_name = 'tm_main'
         try:
@@ -503,9 +529,14 @@ class TaskManager:
             self._log.trace ({'exc': ex, 'cls': __class__, 'fnc': _fnc_name})
             raise
         finally:
+            self._shutdown = True
+            await self.shutdown_async()
             # Notify the parent object of the shutdown using the callback function
             # The parent process will initiate a controlled shutdown along the tree of all created objects
-            self.cb_shutdown ()
+            try:
+                self.cb_shutdown ()
+            finally:
+                self.__is_alive = False
 
 ##### HELPER FUNCTIONS #####
 def is_int(val):

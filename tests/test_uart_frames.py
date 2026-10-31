@@ -133,6 +133,16 @@ class UARTFrameTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'CRC'):
             self.uart_class(self.log, dict(self.config, crc=False), self.colors)
 
+    def test_readiness_resumes_when_receive_buffer_is_drained_or_cleared(self):
+        self.feed(frame(b'a' * 400))
+        self.assertEqual(self.uart.rts_pin.value.call_args.args, (1,))
+        self.assertEqual(self.uart.read_line(), b'a' * 400 + b'\n')
+        self.assertEqual(self.uart.rts_pin.value.call_args.args, (0,))
+        self.feed(b'a' * 400)
+        self.assertEqual(self.uart.rts_pin.value.call_args.args, (1,))
+        self.uart.clear_rx_buffer()
+        self.assertEqual(self.uart.rts_pin.value.call_args.args, (0,))
+
     def test_seeded_byte_payloads_round_trip_and_damaged_checksums_are_rejected(self):
         rng = random.Random(0x2040)
         alphabet = bytes(value for value in range(256) if value != 10)

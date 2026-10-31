@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.5.0.2"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
@@ -242,8 +243,8 @@ class CommandHandlers:
         self._log.aprint (f'{self._tc.info}------------------------------{self._tc.end}')
         for item in self._uart.uart_state ():
             self._log.aprint (f'{item}')
-        val = f'{self._tc.success}ready{self._tc.end}' if self._pin_ready.value() == 1 else f'{self._tc.critical}not ready{self._tc.end}'
-        self._log.aprint (f'{self._tc.par}Client:\t\t{val}')
+        val = f'{self._tc.success}ready{self._tc.end}' if self._uart.can_send else f'{self._tc.critical}not ready{self._tc.end}'
+        self._log.aprint (f'{self._tc.par}Peer CTS:\t{val}')
     def _hdlr_uart_sim(self, par2, params=None):
         self._log.aprint (f'{self._tc.waiting}Simulating UART thread events...{self._tc.end}')
         self._uart.event_simulation(par2 if par2 else 10)

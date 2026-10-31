@@ -1,9 +1,11 @@
 import ast
 import _thread
+import os
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
+from test_uart_handshake import Clock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,8 +49,9 @@ class UARTInitializationTests(unittest.TestCase):
         worker = load_class('lib/uart/uart_thread.py', 'UARTthread', {
             'gc': self.gc, 'FullDuplexUART': duplex,
         })
+        link = load_class('lib/uart/uart_link.py', 'UARTLink', {'time': Clock(), 'os': os})
         helper = load_class('lib/uart/uart_helpers_client.py', 'UARTHelpersClient', {
-            'gc': self.gc, 'UARTthread': worker,
+            'gc': self.gc, 'UARTthread': worker, 'UARTLink': link,
         })
         self.uart_class = load_class('lib/uart/uart.py', 'UARTComms', {
             'gc': self.gc, 'UARTHelpersClient': helper,
@@ -110,6 +113,19 @@ class UARTInitializationTests(unittest.TestCase):
         with self.assertRaises(OSError) as caught:
             self.create_uart()
         self.assertIs(caught.exception, error)
+        self.hardware_factory.assert_not_called()
+
+    def test_async_handler_constructor_does_not_bind_tasks_before_uart_exists(self):
+        cls = load_class('src/async_handlers.py', 'AsyncHandlers', {'__file__': 'async_handlers.py'})
+        handler = cls.__new__(cls)
+        handler._ver = SimpleNamespace(compact=lambda path: 'handler version')
+        cls.__init__(handler)
+        self.assertEqual(handler._v_ah, 'handler version')
+
+    def test_invalid_handshake_timing_fails_before_hardware_initialization(self):
+        self.config['hs_max_attempts'] = 0
+        with self.assertRaisesRegex(ValueError, 'handshake timing'):
+            self.create_uart()
         self.hardware_factory.assert_not_called()
 
 

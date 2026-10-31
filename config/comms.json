@@ -12,6 +12,7 @@
     "hs_interval": 30,
     "hs_rcv_delay": 0.2,
     "hs_rcv_max_cnt": 100,
+    "hs_max_attempts": 3,
     "wd_interval": 10,
     "max_wd_cnt": 10,
     "encoding": "utf-8",

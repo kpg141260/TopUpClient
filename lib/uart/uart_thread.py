@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.21"
+__VERSION__ = "0.5.0.3"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 # This is the SERVER version of the UART Comms class
@@ -48,9 +48,7 @@ class UARTthread:
                         paused = shared['pause']
                     if stopping:
                         # clean shutdown
-                        self._uart.clear_buffers ()
-                        # Send exit command to server
-                        self._uart.send_line ({'cmd': {'act': 'exit'}})
+                        # Core 0 queued the session-specific exit before requesting stop.
                         self._uart._write ()
                         # Wait for server to digest exit command
                         time.sleep (self._thread_interval)

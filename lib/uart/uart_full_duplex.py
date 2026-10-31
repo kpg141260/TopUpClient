@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.4"
+__VERSION__ = "0.5.0.5"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import _thread
@@ -204,6 +204,8 @@ class FullDuplexUART:
                     ptr = (ptr + 1) % self.buf_size
                     if byte == ord('\n'):
                         self.rx_read_ptr = ptr
+                        if self._usage(self.rx_read_ptr, self.rx_write_ptr) < self.rx_low:
+                            self.rts_pin.value(0)
                         break
                 else:
                     return None
@@ -237,6 +239,7 @@ class FullDuplexUART:
     def clear_rx_buffer (self):
         with self.lock:
             self.rx_read_ptr = self.rx_write_ptr
+            self.rts_pin.value(0)
     def clear_tx_buffer (self):
         with self.lock:
             self.tx_read_ptr = self.tx_write_ptr

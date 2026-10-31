@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.3"
+__VERSION__ = "0.5.0.4"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
@@ -17,12 +17,8 @@ from   machine import PWM, Pin
 # which can be activated in async_tasks.json
 class AsyncHandlers:
     def __init__(self):
-        try:
-            self._v_ah = self._ver.compact(__file__)
-            self.__bind_async_fncs ()
-            super.__init__()
-        except Exception as ex:
-            raise ex
+        self._v_ah = self._ver.compact(__file__)
+        super().__init__()
 ########## ASYNCHRONOUS TASK DEFINITIONS ##########
     # ASYNC Function to check the tank
     async def as_tank_check (self, name: str, task_info: dict):
@@ -166,49 +162,32 @@ class AsyncHandlers:
         except Exception:
             raise
     # ASYNC receive coms transmissions
-    async def as_uart_cmd (self, name: str, task_info: dict):
-        self.__log_task_started (name=name, task_info=task_info)
-        gc.collect()
+    async def as_uart_cmd(self, name: str, task_info: dict):
+        self.__log_task_started(name=name, task_info=task_info)
         try:
-            gc.collect()
             while True:
-                if not self.task_register['as_uart_cmd']['psd']:
-                    req = self._uart.read_line ()
+                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                        and self._uart.is_connected and not self._uart.thread_is_paused
+                        and not self._uart.sync_active):
+                    req = self._uart.read_line()
                     if req:
-                        if isinstance (req, bytearray):
-                            if req != b'':
-                                self._log.debug ({'msg': f'as_uart_cmd received: $p${req.decode(self._encoding).strip()}$p$'})
-                                # await self._convert_uart_cmd (json.loads (req.decode(self._encoding)))
-                                del req
-                                self._uart_watchdog_event.set ()
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                        self._log.debug({'msg': 'UART received: %s' % req.decode(self._encoding).strip()})
+                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
-            self.__log_task_cancelling (name=name, task_info=task_info)
-            raise
-        except Exception:
+            self.__log_task_cancelling(name=name, task_info=task_info)
             raise
     # ASYNC uart watchdog - checks whether client is connected
-    async def as_uart_watchdog (self, name: str, task_info: dict):
-        self.__log_task_started (name=name, task_info=task_info)
-        gc.collect()
-        while True:
-            try:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
-                    # wait for event with timeout
-                    await asyncio.wait_for (self._uart_watchdog_event.wait(), timeout=self.task_register[name]['intv'] * self.task_register[name]['mx'])
-                    # Event received in time, reset and keep waiting
-                    self._uart_watchdog_event.set()          
-            except asyncio.TimeoutError:
-                self._log.warning ({'msg': f'Watchdog timeout! $a$Trying to recover...$a$', 'src': __name__, 'acc': self._tc.waiting})
-                if self.task_register['as_uart_cmd']['state'] == self.as_state.RUNNING: self.task_manager.cancel_task (task_name='as_uart_cmd')
-                if self.task_register['as_rtc_sync']['state'] == self.as_state.RUNNING: self.task_manager.cancel_task (task_name='as_rtc_sync')
-                self.task_manager.cancel_task (task_name='as_uart_connect')
-                self.task_manager.cancel_task (task_name='as_uart_watchdog')
-            except asyncio.CancelledError:
-                self.__log_task_cancelling (name=name, task_info=task_info)
-                raise
-            except Exception:
-                raise
+    async def as_uart_watchdog(self, name: str, task_info: dict):
+        self.__log_task_started(name=name, task_info=task_info)
+        try:
+            while True:
+                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                        and not self._uart.thread_is_paused):
+                    self._uart.check_connection_timeout()
+                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
+        except asyncio.CancelledError:
+            self.__log_task_cancelling(name=name, task_info=task_info)
+            raise
     # ASYNC get event log data from coms object
     async def as_uart_event (self, name: str, task_info: dict):
         self.__log_task_started (name=name, task_info=task_info)
@@ -245,90 +224,32 @@ class AsyncHandlers:
         except Exception:
             raise
     # ASYNC Function to connect to uart
-    async def as_uart_connect (self, name: str, task_info: dict):
-        self.__log_task_started (name=name, task_info=task_info)
-        gc.collect()
-        _rsp = {'cmd': {'act': 'hs', 'data': {'val': self._response, 'name': self.self._v_ah, 'to': self.task_register['as_update']['intv']}}}
-        _cmd = {}
+    async def as_uart_connect(self, name: str, task_info: dict):
+        self.__log_task_started(name=name, task_info=task_info)
         try:
-            # Now wait for the client to connect
-            self._log.info ({'msg': f'$a$Waiting for server to connect...$a$', 'acc': self._tc.waiting})
-            # Set the uart handshake state to active
-            self._uart.hs_active = True
-            # Signal to server that client is ready to communicate
-            self._uart.can_receive()
-            # Wait for the client to connect, this will be done by the uart thread
-            while not self._uart.is_connected:
+            while True:
                 if self.task_register[name]['state'] != self.as_state.PAUSED:
-                    try:
-                        _cmd = self._uart.read_line()
-                        if _cmd:
-                            _cmd = json.loads (_cmd.decode(self._encoding).replace('\n', ''))
-                            _cmd = _cmd['cmd']
-                            self._log.aprint ({'msg': f'{self._tc.info}Received: {self._tc.par}{_cmd}{self._tc.end}'})
-                            if _cmd['act'] == 'hs' and _cmd['data']['val'] == self._challenge:
-                                # Correct reply received from server - copy client information
-                                _info = _cmd['data']['name'].split (' ')
-                                if len (_info) > 1:
-                                    self._dvc_name = _info[0]
-                                    self._dvc_ver  = _info[1]
-                                    parts = self._dvc_ver.split('.')
-                                    idx = len (parts)
-                                    self._dvc_build = f'{parts[idx-1]}'
-                                else:
-                                    self._dvc_name  = _info[0]
-                                    self._dvc_build = 'na'
-                                # Adjust watchdog interval to client update frequency
-                                self.task_register['as_uart_watchdog']['intv'] = _rsp['data']['to'] * int (task_info['wd_multiplier'])
-                                self._uart.connected (True)
-                                self._uart.hs_active = False
-                                self._log.info ({'msg': f'$v$Device {self._dvc_name} - Build {self._dvc_build}$v$ connected; WD interval set to $p${self.task_register['as_uart_watchdog']['intv']} sec$p$'})
-                    except Exception as ex:
-                        sys.print_exception (ex)
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
-            else:
-                pass
-            raise asyncio.CancelledError
+                    if self._uart.thread_health() != 'running' or self._uart.thread_is_paused:
+                        self._uart.disconnect('UART worker unavailable')
+                    else:
+                        self._uart.service_connection()
+                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
-            self.__log_task_cancelling (name=name, task_info=task_info)
+            self._uart.disconnect('connection task cancelled', notify=True)
+            self.__log_task_cancelling(name=name, task_info=task_info)
             raise
     # ASYNC Function to synchronise rtc with server, default every 30 seconds 
-    async def as_rtc_sync (self, name: str, task_info: dict):
-        first_run = True
-        time_diff = 0
-        is_synced = False
-        self.__log_task_started (name=name, task_info=task_info)
-        gc.collect()
+    async def as_rtc_sync(self, name: str, task_info: dict):
+        self.__log_task_started(name=name, task_info=task_info)
         try:
-            self._uart.sync_active = True
-            while not is_synced:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
-                    time_diff = self._uart.sync_rtc (time_diff)
-                    if not time_diff:
-                        self._log.warning ({'msg': 'Client CTS not ready', 'src': __name__})
-                    else:
-                        while time_diff != 0:
-                            time_diff = self._uart.sync_rtc (time_diff)
-                        if first_run:
-                            # Now that the rtc has been synchronised set to a lower frequency
-                            self._log.debug ({'msg': f'RTC sync interval changed from: $p${interval} sec$p$ to: $p${frequency} sec$p$'})
-                            self.task_register[name]['intv'] = self.task_register[name]['freq']
-                            first_run = False
-                        if self._uart.is_synchronised:
-                            self._uart.sync_active = False
-                            raise asyncio.CancelledError
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
-            else:
-                self.task_manager.add_task (name='as_uart_cmd')
-                self.task_manager.add_task (name='as_uart_watchdog')
-                # Activate watchdog event
-                self._uart_watchdog_event.set ()
+            while not self._uart.is_synchronised:
+                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                        and self._uart.is_connected and not self._uart.thread_is_paused):
+                    self._uart.sync_rtc()
+                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
-            self.__log_task_cancelling (name=name, task_info=task_info)
+            self.__log_task_cancelling(name=name, task_info=task_info)
             raise
-        except Exception as ex:
-            sys.print_exception (ex)
-            raise ex
     # ASYNC Update server via socket, default every 10 seconds 
     async def as_update ( self, name: str, task_info: dict):
         self.__log_task_started (name=name, task_info=task_info)
@@ -371,83 +292,28 @@ class AsyncHandlers:
                 self._log.trace ({'exc': ex, 'cls': __class__})
                 raise
     # Async function to check thread status
-    async def as_thread_monitor (self, name: str, task_info: dict):
-        interval = task_info.get ('intv', 10)
-        unit     = task_info.get ('unit', 's')
-        self.__log_task_started (name=name, task_info=task_info)
-        gc.collect()
+    async def as_thread_monitor(self, name: str, task_info: dict):
+        self.__log_task_started(name=name, task_info=task_info)
         try:
             while True:
-                # Check if the uart thread is paused and if, pause all tasks that depend on the uart thread
-                if self._uart.thread_is_paused:
-                    if self.task_register['as_uart_connect']['state'] == self.as_state.RUNNING:
-                        self.task_manager.pause_task (task_name='as_uart_connect')
-                    if self.task_register['as_uart_cmd']['state'] == self.as_state.RUNNING:
-                        self.task_manager.pause_task (task_name='as_uart_cmd')
-                    if self.task_register['as_rtc_sync']['state'] == self.as_state.RUNNING:
-                        self.task_manager.pause_task (task_name='as_rtc_sync')
-                    if self.task_register['as_uart_watchdog']['state'] == self.as_state.RUNNING:
-                        self.task_manager.pause_task (task_name='as_uart_watchdog')
-                # Else if the uart thread is running, resume all tasks that depend on the uart thread
-                else:
-                    if self.task_register['as_uart_connect']['state'] == self.as_state.PAUSED:
-                        self.task_manager.resume_task (task_name='as_uart_connect')
-                    if self.task_register['as_uart_cmd']['state'] == self.as_state.PAUSED:
-                        self.task_manager.resume_task (task_name='as_uart_cmd')
-                    if self.task_register['as_rtc_sync']['state'] == self.as_state.PAUSED:
-                        self.task_manager.resume_task (task_name='as_rtc_sync')
-                    if self.task_register['as_uart_watchdog']['state'] == self.as_state.PAUSED:
-                        self.task_manager.resume_task (task_name='as_uart_watchdog')
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                        and self._uart.thread_health() != 'running'):
+                    self._uart.disconnect('UART worker unavailable')
+                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
-            self.__log_task_cancelling (name=name, task_info=task_info)
-            raise
-        except Exception:
+            self.__log_task_cancelling(name=name, task_info=task_info)
             raise
     # ASYNC task to monitor which tasks are running
-    async def as_task_monitor (self, name: str, task_info: dict):
-        interval = task_info.get ('intv', 3)
-        self.__log_task_started (name=name, task_info=task_info)
-
-        ################## ON FIRST RUN ##################
-        # Start the wifi watchdog and NTP update task
-        self.task_manager.add_task (name='as_wifi_watchdog')
-        self.task_manager.add_task (name='as_update_ntp')
-        # Start the communication module
-        if self._uart is not None:
-            self._uart.start ()
-        gc.collect()
-
+    async def as_task_monitor(self, name: str, task_info: dict):
+        self.__log_task_started(name=name, task_info=task_info)
         try:
             while True:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
-                    # Check if the uart is connected
-                    if not self._uart.is_connected:
-                        if self.task_register['as_uart_connect']['state'] not in (self.as_state.RUNNING, self.as_state.PAUSED):
-                            self.task_manager.add_task (name='as_uart_connect')
-                            await asyncio.sleep (interval)
-                        if self.task_register['as_uart_cmd']['state'] == self.as_state.RUNNING:
-                            self.task_manager.cancel_task (task_name='as_uart_cmd')
-                            await asyncio.sleep (interval)
-                        if self.task_register['as_uart_watchdog']['state'] == self.as_state.RUNNING:
-                            self.task_manager.cancel_task (task_name='as_uart_watchdog')
-                    elif self._uart.is_connected and not self._uart.is_synchronised and self.task_register['as_rtc_sync']['state'] not in (self.as_state.RUNNING, self.as_state.PAUSED):
-                        # If the uart is connected but not synchronised, start the rtc sync task
-                        self.task_manager.add_task (name='as_rtc_sync')
-                        await asyncio.sleep (interval)
-                    # Else if the uart thread is connected start all tasks that depend on the uart
-                    else:
-                        if self.task_register['as_uart_connect']['state'] in (self.as_state.RUNNING, self.as_state.PAUSED):
-                            self.task_manager.cancel_task (task_name='as_uart_connect')
-                        if self.task_register['as_uart_watchdog']['state'] not in (self.as_state.RUNNING, self.as_state.PAUSED):
-                            self.task_manager.add_task (name='as_uart_watchdog')
-                        if self.task_register['as_uart_cmd']['state'] not in (self.as_state.RUNNING, self.as_state.PAUSED):
-                            self.task_manager.add_task (name='as_uart_cmd')
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                        and self._uart.thread_health() != 'running'):
+                    self._uart.disconnect('UART worker unavailable')
+                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
-            self.__log_task_cancelling (name=name, task_info=task_info)
-            raise
-        except Exception:
+            self.__log_task_cancelling(name=name, task_info=task_info)
             raise
 
 ########## HELPER METHODS ##########
