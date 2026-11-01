@@ -1,7 +1,8 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.10"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
-    import ujson as json # type: ignore
+    import ujson as json 
 except:
     import json
 
@@ -34,11 +35,9 @@ class FILE_IO:
         del self.txt_rde
         del self.txt_wte
         del self.txt_type
-        try:
+        if self._crypto:
             self._crypto.destructor()
             del self._crypto
-        except:
-            pass
     
     def load_json (self, fn: str):
         return self._load_file (fn, file_type='json')
@@ -93,7 +92,6 @@ class FILE_IO:
                     f.write (data)
             else:
                 raise TypeError (f'{__class__} data must be a dictionary or string')
-
         except OSError as ex:
             if ex.args[0] == 2:
                 raise OSError (self.txt_dne.format (__name__, fn))
@@ -102,9 +100,7 @@ class FILE_IO:
             elif ex.args[0] == 13:
                 raise OSError (self.txt_pde.format (__name__, fn))
             raise
-
         except TypeError as ex:
             raise TypeError (self.txt_type.format (__name__, fn))
-
         except Exception as ex:
             raise OSError (self.txt_wte.format (__name__, fn))

@@ -1,0 +1,13 @@
+{
+    "truncate":        true,
+    "use_color":       true,
+    "file_size":       25000,
+    "log_format_file": "/config/log_format.json",
+    "debug_levels": {
+        "logger": "debug",
+        "file_handler": "info",
+        "uart_handler": "error",
+        "console_handler": "debug",
+        "socket_handler": "warning"
+    }
+}

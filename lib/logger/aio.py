@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.5"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import sys
 import select
@@ -78,7 +79,7 @@ class stdinHandler:
             await self._writer.write(prompt, end=end)
         async with self._lock:
             while True:
-                if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:  # type: ignore
+                if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:  
                     char = sys.stdin.read(1)
                     if char in ("\n", "\r"):
                         return buffer

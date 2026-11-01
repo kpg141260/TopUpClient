@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.17"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import gc
 import os
@@ -36,7 +37,6 @@ def get_time_stamp (ts_format) -> str:
 class FileHandler:
     def __init__ (self, filename: str,truncate: bool=True, max_log_size: int=20000, ts_format: str='%Y-%m-%d %H:%M:%S', name='', level='off'):
         global __fileOperations
-        global __ops_ref_cnt
         self._name           = name
         self._my_ver         = '2025.05.29.172438.12'
         self._log_fn         = filename
@@ -54,7 +54,6 @@ class FileHandler:
         self._ops_ref_cnt += 1
 
     def destructor (self):
-        global __fileOperations
         for formatter in self._formatters:
             if hasattr (formatter, 'destructor'):
                 formatter.destructor ()
@@ -184,7 +183,7 @@ class FileOperations:
     def  init_file (self, filename: str, truncate: bool = False):
         _func_name = 'init_file'
         #TODO: correct disc space calculation
-        size, free, used = self._get_disc_space()
+        _, free, _ = self._get_disc_space()
         if free < self._min_disc_space / 2:
             self._min_disc_space = round (free / 2, -3)
         # Check available disc space
@@ -224,17 +223,11 @@ class FileOperations:
             # Check if dir exists, otherwise create
             self._create_log_dir (filename)
             # File does not exist
-            try:
-                with open (filename, 'a') as f:
-                    f.write (f'{get_time_stamp(self._ts_format)} ---------- Log file {filename} created ----------\n')
-            except OSError as ex:
-                raise ex
+            with open (filename, 'a') as f:
+                f.write (f'{get_time_stamp(self._ts_format)} ---------- Log file {filename} created ----------\n')
 
     def _delete_file (self, filename: str):
-        try:
-            os.remove (filename)
-        except OSError as ex:
-            raise ex
+        os.remove (filename)
 
     def _truncate_log_file (self, filename: str ):
         try:
@@ -367,7 +360,8 @@ class ConsoleHandler:
         gc.collect()
 
     def write (self, event_log):
-        del event_log['tgt']  # Remove handler name to avoid recursion
+        if isinstance(event_log, dict):
+            event_log.pop('tgt', None)  # Remove handler name to avoid recursion
         if self._level <= dbg_lvls.OFF:
             return
         if isinstance (event_log, dict):
@@ -416,7 +410,7 @@ class ConsoleHandler:
 
     def flush(self):
         """Dummy flush method to support sys.stdout redirection."""
-        pass  # ✅ No-op to prevent errors
+        pass  # ✅ No-op to prevent errors  # noqa: PIE790
 
 ###############################################################################
 # LOGGER SOCKET HANDLER
@@ -424,11 +418,16 @@ class ConsoleHandler:
 class SocketHandler:
     def __init__ (self, host: str, port: int, name='', level='off', timeout=2):
         self._host       = host
-        self._port       = port
+        self._port       = int(port)
+        if not 1 <= self._port <= 65535:
+            raise ValueError('SocketHandler port must be between 1 and 65535')
+        if timeout <= 0:
+            raise ValueError('SocketHandler timeout must be positive')
         self._name       = name
         self._level      = dbg_lvls(level)
         self._timeout    = timeout
         self._sock       = None
+        self._retry_started = None
         self._formatters = deque ([], MAX_Q)
         self._filters    = deque ([], MAX_Q)
 
@@ -445,24 +444,33 @@ class SocketHandler:
         gc.collect()
 
     def close (self):
-        if self._sock:
-            try:
-                self._sock.close()
-            except Exception:
-                pass
+        sock = self._sock
         self._sock = None
+        if sock:
+            try:
+                sock.close()
+            except OSError as ex:
+                print(f'[warning] SocketHandler {self._host}:{self._port} close failed: {ex}')
+
+    def _connection_failed (self, error):
+        self._retry_started = time.ticks_ms()
+        self.close()
+        print(f'[warning] SocketHandler {self._host}:{self._port} log delivery failed: {error}')
 
     def _connect (self):
         if self._sock:
             return True
+        if self._retry_started is not None and time.ticks_diff(time.ticks_ms(), self._retry_started) < 5000:
+            return False
         try:
-            addr = socket.getaddrinfo(self._host, self._port)[0][-1]
-            self._sock = socket.socket()
+            addr = socket.getaddrinfo(self._host, self._port, 0, socket.SOCK_STREAM)[0]
+            self._sock = socket.socket(addr[0], addr[1])
             self._sock.settimeout(self._timeout)
-            self._sock.connect(addr)
+            self._sock.connect(addr[-1])
+            self._retry_started = None
             return True
-        except Exception:
-            self.close()
+        except OSError as ex:
+            self._connection_failed(ex)
             return False
 
     def write (self, event_log):
@@ -488,16 +496,28 @@ class SocketHandler:
         if not event_str:
             return
 
-        if event_str[-1] != '\n':
-            event_str += '\n'
-
-        packet = json.dumps({'typ': 'log', 'evt': event_str}, separators=(',', ':'))
+        record = {'message': event_str.rstrip('\r\n')}
+        if isinstance(event_log, dict):
+            level = dbg_lvls(event_log['lvl']).name
+            record['level'] = {'TRACE': 'ERROR', 'PRINT': 'INFO'}.get(level, level)
+        packet = (json.dumps(record, separators=(',', ':')) + '\n').encode('utf-8')
 
         if self._connect():
             try:
-                self._sock.send(packet.encode('utf-8'))
-            except Exception:
-                self.close()
+                started = time.ticks_ms()
+                pending = memoryview(packet)
+                sent = 0
+                while sent < len(packet):
+                    remaining = self._timeout - time.ticks_diff(time.ticks_ms(), started) / 1000
+                    if remaining <= 0:
+                        raise OSError('send timed out')
+                    self._sock.settimeout(remaining)
+                    count = self._sock.send(pending[sent:])
+                    if not count:
+                        raise OSError('connection closed during send')
+                    sent += count
+            except OSError as ex:
+                self._connection_failed(ex)
 
         gc.collect()
 
@@ -525,5 +545,5 @@ class SocketHandler:
         if isinstance(event_log, str):
             return event_log
         elif isinstance(event_log, dict):
-            return json.dumps(event_log, separators=(',', ':'))
+            return str(event_log.get('msg', ''))
         return ''

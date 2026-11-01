@@ -1,16 +1,61 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.24"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import time
-import io
 import gc
 import re
 import ujson           as json
 from   ansi_esc        import text_colors as tc
 from   logger.logger   import dbg_lvls
 
+# Ensure `StringIO` is available across MicroPython ports (io / uio)
+try:
+    import io
+except Exception:
+    io = None
+
+if io is None or not hasattr(io, 'StringIO'):
+    try:
+        import uio as io
+    except Exception:
+        io = None
+
+if io is None or not hasattr(io, 'StringIO'):
+    class _StringIO:
+        def __init__(self):
+            self._buf = []
+        def write(self, s):
+            try:
+                self._buf.append(str(s))
+            except Exception:  # noqa: S110
+                pass
+        def getvalue(self):
+            return ''.join(self._buf)
+        def close(self):
+            self._buf = None
+
+    class _IOMod:
+        pass
+
+    _IOMod.StringIO = _StringIO
+    io = _IOMod
+
+class _ExceptionStringWriter:
+    def __init__(self):
+        self._buf = []
+    def write(self, s):
+        try:
+            self._buf.append(str(s))
+        except Exception:  # noqa: S110
+            pass
+    def getvalue(self):
+        return ''.join(self._buf)
+    def close(self):
+        self._buf = None
+
 def __func_match (match):
     return f'{tc.fnc}{match.group(0)}{tc.end}'
-def __line_match (match):
+def _line_match (match):
     return f'{tc.lno}{match.group(0)}{tc.end}'
 try:
     from sys import print_exception
@@ -26,17 +71,16 @@ except ImportError:  # pragma: no cover
 class LogFormatter:
     def __init__(self,
                  log_fmt: dict,
-                 use_color: bool=None,
-                 use_brkts: bool=None,
-                 use_eid: bool=None,
-                 use_ampm: bool=None,
-                 use_ts: bool=None,
-                 use_pad: bool=None,
+                 use_color: bool | None=None,
+                 use_brkts: bool | None=None,
+                 use_eid: bool | None=None,
+                 use_ampm: bool | None=None,
+                 use_ts: bool | None=None,
+                 use_pad: bool | None=None,
                  align: str='center',
                  name=''):
         self._txt_dm        = ' \x1b[0m sub-dictionary missing'
         self._name          = name
-        self._my_ver        = '2025.10.06.18'
         self._log_col       = {}
         self._log_lbls      = {}
         self._log_conf      = log_fmt['settings'].copy()
@@ -59,8 +103,7 @@ class LogFormatter:
         # build instance-local tag map (copy lists so instances don't share mutable lists)
         self._evt_tag_map = self._build_evt_tag_lookup(self._orig_cfg.get('evt_tag_map', {}))
         self._filters     = self._orig_cfg.get('filters', {})
-        # Initialize regex filter helper
-        self.rxf            = regex_filters
+        self.rxf          = regex_filters
         self.rxf.init_cache (self._filters)
 
         self._evt_fmt_lbls = log_fmt['logFormat']['evt_labels'].copy()
@@ -102,8 +145,6 @@ class LogFormatter:
         else:
             self._log_lbls = {}
 
-        #print (f'{tc.info}{self.__class__.__name__} initialized. {tc.par}Color: {tc.success}{self._use_col}{tc.par}, EID: {tc.success}{self._use_eid}{tc.par}, Brackets: {tc.success}{self._use_brkts}{tc.par}, AM/PM: {tc.success}{self._use_ampm}{tc.par}, Timestamp: {tc.success}{self._use_ts}{tc.par}, Label padding: {tc.success}{self._use_pad}{tc.par}, Label alignment: {tc.success}{self._align}{tc.end}')
-        gc.collect()
     def __destruct__ (self):
         self._log_col.clear()
         del self._log_col
@@ -127,7 +168,7 @@ class LogFormatter:
         del self._txt_dm
         gc.collect()
     def __repr__ (self):
-        return f'{self.__class__.__name__} Ver.: ({self._my_ver})'
+        return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
     def __str__ (self):
         return f'{self.__class__.__name__}'
     def format_output(self, event_log):
@@ -135,7 +176,7 @@ class LogFormatter:
             Updated to minimize temporary allocations and call gc.collect() to free fragmentation. """
         if not isinstance(event_log, (dict, str)):
             raise TypeError(f'{__class__.__name__} event_log must be a \'dictionary\' or \'string\'')
-        if isinstance(event_log, str) or not any(k in event_log for k in self._evt_tag_map.keys()):
+        if isinstance(event_log, str) or not any(key in event_log for key in self._evt_tag_map):
             return event_log
 
         event = self._pre_process_event(event_log)
@@ -222,20 +263,27 @@ class LogFormatter:
             col_fn   = self._log_col.get('success',  '')
             col_end  = self._log_col.get('end',      '')
         else:
-            col_crit = col_trc = col_err = col_end = col_fn = col_fnc = col_end = ''
+            col_crit = col_trc = col_err = col_end = col_fn = col_fnc = ''
 
         # capture exception output
-        output = io.StringIO()
+        try:
+            output = io.StringIO()
+        except Exception:
+            output = _ExceptionStringWriter()
+
         try:
             print_exception(exception, output)
         except Exception:
             # fallback if print_exception signature differs
             try:
                 output.write(str(exception))
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
         msg = output.getvalue()
-        output.close()
+        try:
+            output.close()
+        except Exception:  # noqa: S110
+            pass
 
         # collapse to single line and simplify text
         msg = ' '.join(msg.splitlines())
@@ -264,13 +312,13 @@ class LogFormatter:
             ('err',   lambda m: f'{col_crit}{m.group(1)}{col_err}'), # SomethingError:
             ('fn',    lambda m: f'{col_fn}{m.group(1)}{col_end}'),   # filename match
             ('func',  lambda m: f'{col_fn}{m.group(1)}{col_end}'),   # filename match
-            ('line',  __line_match)                                  # line N
+            ('line',  _line_match)                                  # line N
         ]
         for name, repl in subs:
             try:
                 pat = self.rxf.compiled_pattern(name)
                 msg = pat.sub(repl, msg)
-            except Exception:
+            except Exception:  # noqa: S110
                 # ignore missing/invalid patterns
                 pass
 
@@ -283,11 +331,14 @@ class LogFormatter:
         del subs
         gc.collect()
         return msg
+
     def _pre_process_event ( self, event_log: dict):
+        event_log = event_log.copy()
         # Reset base color and label color
         # EVENT TAG STRUCTURE: [0]=short-tag, [1]=prefix, [2]=suffix, [3]=color
         self._evt_tag_map['lbl'][3] = ''
         self._evt_tag_map['msg'][3] = ''
+
         # Process event_log dictionary keys according to specified format
         if self._use_col:
             # Set the base color of the event
@@ -299,14 +350,17 @@ class LogFormatter:
             self._base_col = ''
             self._accent   = ''
             # Strip any tags from the event message
-            event_log['msg'] = self.strip_tags (event_log['msg'])
+            event_log['msg'] = self.strip_tags (event_log.get('msg', ''))
+
         # Set label and message colors
         self._evt_tag_map['lbl'][3] = self._base_col
         self._evt_tag_map['msg'][3] = self._base_col
+
         # If an exception object is provided, format it and set as the message
         if 'exc' in event_log and event_log['exc'] is not None:
             event_log['msg'] = self._format_trace(event_log['exc'])
             event_log.pop('exc', None)
+
         # Format log identifier with leading zeros and prefix, if defined
         eid_formatted = ''
         if self._use_eid:
@@ -315,20 +369,24 @@ class LogFormatter:
             except (ValueError, TypeError):
                 eid_formatted = ''
         event_log['eid'] = eid_formatted
+
         # Format timestamp if required
         ts = ''
         if self._use_ts:
-            try:
-                ts = event_log.get('ts')
-            except Exception:
-                pass
-            ts = ts if self.is_timestamp(ts) else self.get_time_stamp(format=self._log_fmt['ts_format'], use_12_hour=self._use_ampm)
+            ts = event_log.get('ts', '')
+            if not self.is_timestamp(ts):
+                ts = self.get_time_stamp(
+                    format=self._log_fmt.get('ts_format', '%Y-%m-%d %H:%M:%S'),
+                    use_12_hour=self._use_ampm
+                ) or ''
         event_log['ts'] = ts
+
         if self._show_mem:
             mem_info = f' [{gc.mem_free()} bytes free]'
             if self._use_col:
                 mem_info = f' {self._evt_tag_map['mem'][3]}{mem_info}{self._log_col.get("end", "")}'
             event_log['mem'] = mem_info
+
         for key in list(event_log.keys()):
             # Remove any keys not in the event format fields, except for 'lvl'
             if key not in self._evt_fmt_lbls and key != 'lvl':
@@ -337,6 +395,7 @@ class LogFormatter:
                 if  event_log[key] is not None and isinstance (event_log[key], str):
                     # Remove any leading/trailing brackets
                     event_log[key] = self.strip_brackets (event_log[key], self._filters['brackets'])
+
         return event_log
     def _colorize(self, text):
         """
@@ -368,7 +427,7 @@ class LogFormatter:
 
                 # Safely extract parts from tag_info
                 # Structure: [0]=short-tag, [1]=prefix, [2]=suffix, [3]=color
-                short_tag = tag_info[0] if len(tag_info) > 0 else ''
+                short_tag = tag_info[0] if len(tag_info) > 0 else '' # noqa
                 prefix    = tag_info[1] if len(tag_info) > 1 else ''
                 suffix    = tag_info[2] if len(tag_info) > 2 else ''
                 color     = tag_info[3] if len(tag_info) > 3 else ''
@@ -426,7 +485,7 @@ class LogFormatter:
         if not isinstance (fields, list):
             raise TypeError (f'{__class__} set_event_format \'fields\' must be a list of log-tag specifiers in the form of \'%abc%\'')
         self._evt_fmt_lbls = fields
-    def use_colors (self, use: bool, colors: dict=None):
+    def use_colors (self, use: bool, colors: dict | None=None):
         self._use_col = use
         if self._log_colors == {}:
             self._log_colors = colors if colors is not None else {}
@@ -450,73 +509,47 @@ class LogFormatter:
     ########## STATIC METHODS ##########
     @staticmethod
     def strip_esc_seq(s):
-        out = []
-        i = 0
-        length = len(s)
-        while i < length:
-            c = s[i]
-
-            # --- 1️⃣ Remove ANSI escape sequences ---
-            if c == ('\x1b' or '\u001b') and i + 1 < length and s[i + 1] == '[':
-                i += 2
-                while i < length and s[i] != 'm':  # skip until 'm'
-                    i += 1
-                i += 1  # skip 'm'
-                continue
-            # --- otherwise keep character ---
-            out.append(c)
-            i += 1
-        # Clean up extra spaces
-        return str (''.join(out))
+        start = s.find('\x1b[')
+        while start != -1:
+            end = s.find('m', start + 2)
+            if end == -1:
+                return s[:start]
+            s = s[:start] + s[end + 1:]
+            start = s.find('\x1b[', start)
+        return s    
+    
     @staticmethod
     def strip_tags(s, t: str = '$'):
-        # simple pattern to strip any $<letter>$ marker
-        out = []
-        i = 0
         try:
-            length = len(s,)
+            length = len(s)
         except (ValueError, TypeError):
             return s
-        while i < length:
-            c = s[i]
-
-            # --- 2️⃣ Remove $tags$ (1–3 letters, optional spaces) ---
-            if c == '$':
-                j = i + 1
-                letters = 0
-                while j < length and s[j].isalpha() and letters < 3:
-                    j += 1
-                    letters += 1
-                if j < length and s[j] == t:
-                    # Found $x$, $xx$, or $xxx$
-                    i = j + 1
-                    continue
-            out.append(c)
-            i += 1
-        # Clean up extra spaces
-        return str (''.join(out))
-    @staticmethod
-    def strip_brackets (s, f):
-        # simple pattern to strip any brackets
-        out = []
         i = 0
-        length = len(s)
         while i < length:
-            c = s[i]
-            # --- 3️⃣ Remove brackets ---
-            if c in f:
-                i += 1
-                continue
-            out.append(c)
+            if s[i] == '$':
+                j = i + 1
+                while j < length and j - i <= 3 and s[j].isalpha():
+                    j += 1
+                if j < length and s[j] == t:
+                    s = s[:i] + s[j + 1:]
+                    length = len(s)
+                    continue
             i += 1
-        # Clean up extra spaces
-        return str (''.join(out))
+        return s
+    
+    @staticmethod
+    def strip_brackets(s, f):
+        for char in f:
+            s = s.replace(char, '')
+        return s    
+    
     @staticmethod
     def strip_spaces (s):
         cleaned = s.strip()
         while '  ' in cleaned:
             cleaned = cleaned.replace('  ', ' ')
         return cleaned
+    
     @staticmethod
     def pad_string(s, length, align: str='center'):
         """
@@ -535,6 +568,7 @@ class LogFormatter:
         left = (padcnt // 2) + (padcnt % 2)
         right = padcnt - left
         return ' ' * left + s + ' ' * right
+    
     @staticmethod
     def has_tags(s: str):
         """Return True if text contains any $x$, $xx$ or $xxx$ tag (no regex)."""
@@ -558,8 +592,9 @@ class LogFormatter:
             else:
                 i += 1
         return False
+    
     @staticmethod
-    def get_time_stamp (format: str=None, prefix='', use_12_hour=False) -> str:
+    def get_time_stamp (format: str | None=None, prefix='', use_12_hour=False) -> str:
         if format is None:
             return
         tm = time.gmtime()
@@ -582,30 +617,43 @@ class LogFormatter:
         for key, value in format_map.items():
             format = format.replace(key, value)
         return prefix + format
+
     @staticmethod
     def is_timestamp(s):
-        # List of regex patterns for different timestamp formats
-        patterns = [
-            r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$',           # yyyy-mm-dd hh:mm:ss
-            r'^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}$',           # yyyy/mm/dd hh:mm:ss
-            r'^\d{2}:\d{2}:\d{4} \d{2}:\d{2}:\d{2}$',           # dd:mm:yyyy hh:mm:ss
-            r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$',           # dd/mm/yyyy hh:mm:ss
-            r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} (AM|PM)$',   # yyyy-mm-dd hh:mm:ss AM/PM
-            r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2} (AM|PM)$',   # dd/mm/yyyy hh:mm:ss AM/PM
-            r'^\d{2}:\d{2}:\d{4} \d{2}:\d{2}:\d{2} (AM|PM)$',   # dd:mm:yyyy hh:mm:ss AM/PM
-            # Add more patterns as needed
-        ]
-        return any(re.match(p, s) for p in patterns)
+        if not isinstance(s, str):
+            return False
+
+        # Expected examples:
+        # 2026-06-24 18:30:45
+        # 2026/06/24 18:30:45
+        if len(s) < 19:
+            return False
+
+        return (
+            s[0:4].isdigit() and
+            s[4] in ('-', '/') and
+            s[5:7].isdigit() and
+            s[7] in ('-', '/') and
+            s[8:10].isdigit() and
+            s[10] == ' ' and
+            s[11:13].isdigit() and
+            s[13] == ':' and
+            s[14:16].isdigit() and
+            s[16] == ':' and
+            s[17:19].isdigit()
+        )
 
 class regex_filters:
     """
     Lightweight regex utility for MicroPython.
     Supports dynamic $x$...$x$ tag matching with caching.
     """
-    _cache         = {}
+    _cache: dict | None = None
 
     @classmethod
     def init_cache(cls, patterns):
+        if cls._cache is None:
+            cls._cache = {}
         try:
             """Compile and cache all predefined regex patterns."""
             for name, pattern in patterns.items():
@@ -614,6 +662,7 @@ class regex_filters:
         except Exception as e:
             cls._cache = {}
             raise RuntimeError (f"Error initializing regex cache: {e}, Pattern: {name} {pattern}")
+
     @classmethod
     def compiled_pattern (cls, name: str):
         """Return compiled pattern or None if not present (compat wrapper)."""

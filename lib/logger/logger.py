@@ -1,7 +1,9 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.6"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import  gc
 import  time
+from    typing import ClassVar
 import  ujson as json
 from    collections   import deque
 from    logger.aio    import stdinHandler, stdoutHandler
@@ -34,6 +36,7 @@ class DbgLevel:
     def __ge__(self, other): return self.value >= int(other)
     def __hash__(self):      return hash(self.value)
     def desc (self):         return self.description
+
 class dbg_lvls:
     OFF:        DbgLevel
     DEBUG:      DbgLevel
@@ -43,10 +46,10 @@ class dbg_lvls:
     CRITICAL:   DbgLevel
     TRACE:      DbgLevel
     PRINT:      DbgLevel
-    
-    _levels       = {}
-    _name_to_obj  = {}
-    _value_to_obj = {}
+
+    _levels: ClassVar[dict[str, DbgLevel]] = {}
+    _name_to_obj: ClassVar[dict[str, DbgLevel]] = {}
+    _value_to_obj: ClassVar[dict[int, DbgLevel]] = {}
 
     def __new__ (cls, value):
         """Allow dbg_lvls('DEBUG') style."""
@@ -71,35 +74,23 @@ class dbg_lvls:
         # Initialise Debug Levels
         # Create named instances like dbg_lvls.DEBUG
         for name, values in levels.items ():
-            try:
-                obj = DbgLevel (name, values[0], values[1])
-                setattr (dbg_lvls, name, obj)
-                dbg_lvls._name_to_obj[name]       = obj
-                dbg_lvls._value_to_obj[values[0]] = obj
-            except (ValueError, KeyError):
-                raise
+            obj = DbgLevel (name, values[0], values[1])
+            setattr (dbg_lvls, name, obj)
+            dbg_lvls._name_to_obj[name]       = obj
+            dbg_lvls._value_to_obj[values[0]] = obj
 
 class Logger:
 ###############################################################################
-# LOGGER CLASS WIDE VARIABLES
-###############################################################################
-    # Disable shutdown mode TODO: can possibly be removed later
-    __shutdown = False
-    level      = None
-    log_config = {}
-
-###############################################################################
 # LOGGER INITIALISATION
 ###############################################################################
-    def __init__(self, log_cnf_fn: str, level=None, name: str='root', version=None):
+    def __init__(self, log_cnf_fn: str, level=None, name: str='root'):
+        Logger.log_config = {}
         print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129minitialising...\u001b[0m')
         gc.collect ()
         _mem = gc.mem_free()
+        self.__shutdown    = False
+        Logger.level       = level
         self._name         = name
-        if version:
-            self._my_ver   = version.info (__file__)
-        else:
-            self._my_ver   = "2025.11.11.16"
         self._is_init      = False
         self._handlers     = deque ([], MAX_Q)
         self._lock_logger  = asyncio.Lock()
@@ -124,13 +115,12 @@ class Logger:
             self._get_ts      = DefaultLogHandler.get_time_stamp
             self._is_init     = True
             self.info ({'msg': f'\u001b[1;38;5;154mLogger initialised.\u001b[38;5;46m Debug level: \u001b[38;5;33m{Logger.level}={int(Logger.level)}\u001b[38;5;46m Memory used: \u001b[38;5;33m{_mem - gc.mem_free()} bytes\u001b[0m', 'eid': 0})
-        except Exception as ex:
-            raise ex
         finally:
             gc.collect()
-    def __destruct__ (self):
+
+    def destructor (self):
         try:
-            self.debug ({'msg': f'__destruct__ launched...', 'cls': __class__, 'src': None, 'fnc': None, 'acc': '\u001b[1;38;5;105m' })
+            self.debug ({'msg': '__destruct__ launched...', 'cls': __class__, 'src': None, 'fnc': None, 'acc': '\u001b[1;38;5;105m' })
             for handler in self._handlers:
                 if hasattr (handler, '__destruct__'):
                     handler.__destruct__()
@@ -144,35 +134,36 @@ class Logger:
             del self._lock_writer
             del self._lock_reader
             del self._lock_logger
-        except Exception as ex:
-            raise ex
         finally:
             print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129m__destruct__ finished...\u001b[0m')
             gc.collect()
+
     def __repr__ (self):
-        return f'{self.__class__.__name__} Ver.: ({self._my_ver})'
+        return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
+
     def __str__ (self):
         return f'{self.__class__.__name__}'
+
     def __load_and_check_log_config_file (self, log_cnf_fn: str):
-        try:
-            with open (log_cnf_fn, 'r') as f:
-                Logger.log_config = json.load (f)
-            if 'settings' not in Logger.log_config:
-                raise KeyError (f'Logger config file {log_cnf_fn} missing \'settings\' section!')
-            if 'tgt_dbg_lvls' not in Logger.log_config:
-                raise KeyError (f'Logger config file {log_cnf_fn} missing \'tgt_dbg_lvls\' section!')
-            if 'dbg_lvl_map' not in Logger.log_config:
-                raise ValueError (f'Logger config file {log_cnf_fn} missing \'dbg_lvl_map\' section!')
-            if 'logFormat' not in Logger.log_config:
-                raise KeyError (f'Logger config file {log_cnf_fn} missing \'logFormat\' section!')
-            if 'logColors' not in Logger.log_config and Logger.log_config['logFormat'].get('use_color', None):
-                raise KeyError (f'Logger config file {log_cnf_fn} missing \'logColors\' section!')
-            if 'evt_tag_map' not in Logger.log_config:
-                raise KeyError (f'Logger config file {log_cnf_fn} missing \'evt_tag_map\' section!')
-            if 'filters' not in Logger.log_config:
-                raise KeyError (f'Logger config file {log_cnf_fn} missing \'filters\' section!')
-        except Exception as ex:
-            raise ex
+        print (f"Loading file {log_cnf_fn}")
+
+        with open (log_cnf_fn, 'r') as f:
+            Logger.log_config = json.load (f)
+        if 'settings' not in Logger.log_config:
+            raise KeyError (f'Logger config file {log_cnf_fn} missing \'settings\' section!')
+        if 'tgt_dbg_lvls' not in Logger.log_config:
+            raise KeyError (f'Logger config file {log_cnf_fn} missing \'tgt_dbg_lvls\' section!')
+        if 'dbg_lvl_map' not in Logger.log_config:
+            raise ValueError (f'Logger config file {log_cnf_fn} missing \'dbg_lvl_map\' section!')
+        if 'logFormat' not in Logger.log_config:
+            raise KeyError (f'Logger config file {log_cnf_fn} missing \'logFormat\' section!')
+        if 'logColors' not in Logger.log_config and Logger.log_config['logFormat'].get('use_color', None):
+            raise KeyError (f'Logger config file {log_cnf_fn} missing \'logColors\' section!')
+        if 'evt_tag_map' not in Logger.log_config:
+            raise KeyError (f'Logger config file {log_cnf_fn} missing \'evt_tag_map\' section!')
+        if 'filters' not in Logger.log_config:
+            raise KeyError (f'Logger config file {log_cnf_fn} missing \'filters\' section!')
+
 ###############################################################################
 # LOGGER MAIN METHODS
 ###############################################################################
@@ -185,9 +176,7 @@ class Logger:
                 for handler in self._handlers:
                     # Filter out handlers that do not match the name
                     # This is useful when using multiple instances of the same handler
-                    if event_log.get('tgt', '') == '':
-                        handler.write (event_log)
-                    elif handler.name == event_log.get('tgt'):
+                    if event_log.get('tgt', '') == '' or handler.name == event_log.get('tgt'):
                         handler.write (event_log)
     def _log (self, event_log):
         # Sync log handler
@@ -199,20 +188,18 @@ class Logger:
                 if isinstance (event_log, dict):
                     # Filter out handlers that do not match the name
                     # This is useful when using multiple instances of the same handler
-                    if event_log.get('tgt', '') == '':
-                        handler.write (event_log)
-                    elif handler.name == event_log.get('tgt'):
+                    if event_log.get('tgt', '') == '' or handler.name == event_log.get('tgt'):
                         handler.write (event_log)
                 else:
                     handler.write (event_log)
     def log (self, event_log, level: int):
         """Wrapper function to allow logging from both async and sync contexts"""
         # Set the log level and label
-        # If the event_log is a dictionary, format accordingly 
+        # If the event_log is a dictionary, format accordingly
         if isinstance (event_log, dict):
             event_log['lvl'] = level
             event_log['lbl'] = dbg_lvls(level).desc()
-            
+
             # Increment log id only if the initial value is > 0 and the eid_format is > 0
             # This ensures that changes to basicFormat are reflected in the log
             event_log['eid'] = self._log_id
@@ -233,7 +220,7 @@ class Logger:
             except RuntimeError:
                 # Use the sync log function
                 self._log (event_log)
-            
+
 ###############################################################################
 # LOGGER PUBLIC LOG METHODS
 ###############################################################################
@@ -301,10 +288,7 @@ class Logger:
         if handler not in self._handlers:
             if not hasattr (handler, 'write') or not callable (handler.write) or not hasattr (handler, 'name'):
                 raise AttributeError (f'{__class__.__name__} handler object must have \'write\' and \'name\' attributes!')
-            try:
-                self._handlers.append (handler)
-            except Exception as ex:
-                raise ex
+            self._handlers.append (handler)
             if hasattr (handler, 'setLock'):
                 handler.setLock (self._lock_writer)
             if hasattr (handler, 'setWriter'):
@@ -373,7 +357,7 @@ class Logger:
             return ' ' * (padding // 2) + s + ' ' * (padding // 2)
         else:
             return ' ' * ((padding // 2) + 1) + s + ' ' * (padding // 2)
-    
+
 ###############################################################################
 # LOGGER DEFAULT HANDLER
 ###############################################################################
@@ -403,7 +387,7 @@ class DefaultLogHandler:
         # If the event is a dictionary proceed
         if not isinstance (event, dict):
             raise TypeError (f'{__class__} {__name__} event must be a string or dictionary')
-        format_str = self._format        
+        format_str = self._format
         if int (event['lvl']) == dbg_lvls.TRACE:
             print_exception (event['exc'])
             event['msg'] = 'Trace output above'
@@ -429,11 +413,12 @@ class DefaultLogHandler:
                     if key == 'eid':
                         if int (value) > 0:
                             value = f'{int (value):06d}'
-                        else: value = ''
+                        else:
+                            value = ''
                     format_str = format_str.replace (f'%{key}%', value)
             else:
                 format_str = format_str.replace (f'%{key}%', '')
-                
+
         cleaned = format_str.strip()
         while '  ' in cleaned:
             cleaned = cleaned.replace('  ', ' ')
