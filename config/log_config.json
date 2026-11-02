@@ -5,7 +5,7 @@
         "host": "10.10.0.60",
         "port": "5514",
         "enable": {
-            "socket": true,
+            "socket": false,
             "file": false,
             "console": true
         }

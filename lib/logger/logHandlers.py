@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.17"
+__VERSION__ = "0.6.0.18"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import gc
@@ -11,7 +11,10 @@ from   machine       import UART
 try:
     import usocket as socket
 except ImportError:
-    import socket
+    try:
+        import socket
+    except ImportError:
+        socket = None
 
 MAX_Q = 4
 __fileOperations = None
@@ -417,12 +420,14 @@ class ConsoleHandler:
 ###############################################################################
 class SocketHandler:
     def __init__ (self, host: str, port: int, name='', level='off', timeout=2):
-        self._host       = host
-        self._port       = int(port)
-        if not 1 <= self._port <= 65535:
+        if socket is None:
+            raise ImportError('SocketHandler requires firmware with socket support')
+        if not 1 <= port <= 65535:
             raise ValueError('SocketHandler port must be between 1 and 65535')
         if timeout <= 0:
-            raise ValueError('SocketHandler timeout must be positive')
+            raise ValueError('SocketHandler timeout must be positive and non-zero')
+        self._host       = host
+        self._port       = int(port)
         self._name       = name
         self._level      = dbg_lvls(level)
         self._timeout    = timeout
@@ -439,8 +444,9 @@ class SocketHandler:
         for filter in self._filters:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
-        del self._formatters
-        del self._filters
+        self._formatters = None
+        self._filters    = None
+        self._sock       = None
         gc.collect()
 
     def close (self):
