@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.5.0.2"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try: 
     import  gc, time, json, sys # type: ignore

@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.11"
+__VERSION__ = "0.5.0.2"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # simple shared module used by both cores
 import _thread

@@ -1,26 +1,29 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.5.0.4"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 ########## CLASS IMPORTS ##########
 import sys
 try:
     import uasyncio as asyncio
-except:
+except ImportError:
     import asyncio
 try:
     import ujson as json
-except:
+except ImportError:
     import json
 
-import gc, select, sys, re
+import gc, select, re
 from   machine          import Pin, PWM, RTC
 from   collections      import OrderedDict
 try:
-    from   tank_controller  import TankController as TankController
-    from   helpers          import helpers, FixedSizeFIFO as FIFO
-    from   uart.uart        import UARTComms as UARTComms
-    from   task_manager     import TaskManager as TaskManager
-    from   async_handlers   import AsyncHandlers
-    from   cmd_handlers     import CommandHandlers
+    
+    from   tank_controller   import TankController
+    from   helpers           import helpers, FixedSizeFIFO as FIFO
+    from   uart.uart         import UARTComms
+    from   lib.logger.logger import Logger
+    from   task_manager      import TaskManager
+    from   async_handlers    import AsyncHandlers
+    from   cmd_handlers      import CommandHandlers
 except Exception as ex:
     sys.print_exception (ex)
     raise ImportError (f'{__name__}: {ex}')
@@ -44,7 +47,7 @@ class Processor (CommandHandlers, AsyncHandlers):
         self._log   = logger
         self._fio   = file_io
         self._tc    = tc
-        self._log.debug ({'msg': f'$p${self._v_prc}$p$ $a$constructor launched...$a$', 'cls': __class__, 'cls': __class__, 'src': __name__, 'acc': self._tc.waiting})
+        self._log.debug ({'msg': f'$p${self._v_prc}$p$ $a$constructor launched...$a$', 'cls': __class__, 'src': __name__, 'acc': self._tc.waiting})
         self._cmd_buffer  = AsyncUARTBuffer(self._log.reader_lock(),logger.aReader())
         if cb_exit is None:
             raise ValueError (f'{'init'}: Parameter cb_exit cannot be None!')
@@ -147,7 +150,7 @@ class Processor (CommandHandlers, AsyncHandlers):
             except AttributeError:
                 self._log.warning ({'msg': f'$p${task_name}$p$ not found in class $p${cls_name}$p$', 'src': __name__})
 ########## CLASS DESTRUCTORS AND CLEANUP METHODS ##########
-    # Class destructer
+    # Class destructor
     def destructor (self):
         if self._destructed:
             return
@@ -160,7 +163,7 @@ class Processor (CommandHandlers, AsyncHandlers):
             del self.task_register
             del self._uart_watchdog_event
             del self._tank_ctrl
-            for key in self.state.keys():
+            for key in self.state:
                 self.state[key].clear()
             self.state.clear()
             del self.state
@@ -184,7 +187,7 @@ class Processor (CommandHandlers, AsyncHandlers):
         return f'{self.__class__}'
 ########## CLASS DATA, CMD PROCESSING AND HELPER METHODS ##########
     async def analyse_uart_cmd (self, cmd: dict):
-        cmd_type = list (cmd.keys())[0]
+        cmd_type = next(iter(cmd.keys()))
         if cmd_type in self._server_cmds:
             target  = cmd.get(cmd_type).get('tgt',  None) 
             device  = cmd.get(cmd_type).get('dvc',  None)
@@ -194,8 +197,8 @@ class Processor (CommandHandlers, AsyncHandlers):
             if cmd_type == 'cmd':
                 request = [target, device, action, data]
             elif cmd_type == 'req':
+                # TODO: Implement request handling logic here
                 token = cmd.get(cmd_type).get('tok', None)
-                pass
             elif cmd_type == 'msg':
                 # Print the message and return
                 self._log.aprint (f'Message received: {cmd[cmd_type]['data']}')
@@ -205,7 +208,7 @@ class Processor (CommandHandlers, AsyncHandlers):
 ########## CLASS DATA, CMD PROCESSING AND HELPER METHODS ##########
     async def _convert_uart_cmd (self, cmd: dict):
         __fnc_name = '_convert_uart_cmd'
-        key = list (cmd.keys())[0] 
+        key = next(iter(cmd.keys())) 
         
         if key not in self._client_reqs:
             self._log.warning({
@@ -303,14 +306,13 @@ class Processor (CommandHandlers, AsyncHandlers):
         # Prevent shutdown cascade
         if not self._shutdown:
             if not exc:
-                self._log.info ({'msg': f'$a$Executing shutdown request...$a$', 'src': __name__, 'acc': self._tc.waiting})
+                self._log.info ({'msg': '$a$Executing shutdown request...$a$', 'src': __name__, 'acc': self._tc.waiting})
             else:
-                self._log.info ({'msg': f'$a$Shutting down due to exception...$a$', 'src': __name__, 'acc': self._tc.waiting})                
+                self._log.info ({'msg': '$a$Shutting down due to exception...$a$', 'src': __name__, 'acc': self._tc.waiting})                
             # Set the shutdown flag to signal tm_main to execute controlled shutdown
             # Using a flag rather than calling shutdown directly prevents a hung shutdown in the async engine
             self._shutdown = True
-            if self.task_manager:
-                if self.task_manager.is_alive:
+            if self.task_manager and self.task_manager.is_alive:
                     self.task_manager.stop()
     def shutdown (self):
         # NOTE: The ORDER of the object shutdown is IMPORTANT:
@@ -325,8 +327,7 @@ class Processor (CommandHandlers, AsyncHandlers):
             if self._uart is not None:
                 self._uart.shutdown ()
             # Shutdown and cleanup Task Manager
-            if self.task_manager is not None:
-                if self.task_manager.is_alive:
+            if self.task_manager is not None and self.task_manager.is_alive:
                     self.task_manager.shutdown()
                     self.task_manager.check_tasks_done()
                     self.task_manager.destructor()
@@ -344,7 +345,7 @@ class Processor (CommandHandlers, AsyncHandlers):
         self._log.aprint (f'\n{self._tc.ul}{self._tc.yellow}Allocated Memory: {self._tc.par}{self.state['sys']['srvr']['mem_a']}{self._tc.end}')
         self._log.aprint (f'\n{self._tc.ul}{self._tc.yellow}Free Memory: {self._tc.par}{self.state['sys']['srvr']['mem_f']}{self._tc.end}')
         self._log.aprint (f'\n{self._tc.ul}{self._tc.yellow}Server CPU Temperature{self._tc.par}{self.state['sys']['srvr']['c_tmp']}{self._tc.end}')
-    def task_interval (self, task_name: str, params: list = []):
+    def task_interval (self, task_name: str, params: list | None = None):
         self.task_manager.task_interval (task_name=task_name, params=params)
     def dir_async_fnc (self, cls_name: str):
         return [name for name in dir(cls_name) if callable(getattr(cls_name, name)) and name.startswith('as_')]

@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.5.0.3"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import onewire, ds18x20, time        # type: ignore
 from   machine     import Pin, Timer # type: ignore
@@ -29,7 +30,6 @@ class Relay:
         OFF = False
 
     def __init__(self, config: dict, logger, name: str, tc, ver, enabled) -> None:
-        global block_active
         self._my_ver = ver.compact(__file__)
         self._name = name
         self._log = logger
