@@ -1,13 +1,88 @@
 {
-    "truncate":        true,
-    "use_color":       true,
-    "file_size":       25000,
-    "log_format_file": "/config/log_format.json",
-    "debug_levels": {
-        "logger": "debug",
-        "file_handler": "info",
-        "uart_handler": "error",
-        "console_handler": "debug",
-        "socket_handler": "warning"
+    "settings": {
+        "truncate":   false,
+        "file_size":  5000,
+        "host": "10.10.0.60",
+        "port": "5514",
+        "enable": {
+            "socket": true,
+            "file": false,
+            "console": true
+        }
+    },
+    "tgt_dbg_lvls": {
+        "logger":          "debug",
+        "file_handler":    "info",
+        "console_handler": "info",
+        "socket_handler":  "debug"
+    },
+    "dbg_lvl_map": {
+        "OFF":      [-1, "off"],
+        "DEBUG":    [10, "debug"],
+        "INFO":     [20, "info"],
+        "WARNING":  [30, "warning"],
+        "ERROR":    [40, "error"],
+        "CRITICAL": [50, "critical"],
+        "TRACE":    [60, "traceback"],
+        "PRINT":    [70, "print"]
+    },
+    "logFormat": {
+        "ts_format":   "%Y-%m-%d %H:%M:%S",
+        "evt_format":  "%eid% %ts% %lbl% %dvc% %adr% %src% %cls% %fnc% %pid% %msg% %mem%",
+        "evt_labels":  ["eid", "ts", "lbl", "dvc", "adr", "src", "cls", "fnc", "pid", "msg", "mem"],
+        "separator":   " ",
+        "eid_format":  "06d",
+        "eid_value":   1,
+        "eid_prefix":  "EID ",
+        "eid_suffix":  "",
+        "show_mem":    true,
+        "use_color":   true,
+        "use_eid":     false,
+        "use_ts":      true,
+        "use_ampm":    false,
+        "use_brkts":   true,
+        "use_pad":     true,
+        "pad_align":   "center"
+    },
+    "logColors": {
+        "off":      "\u001b[38;5;8m",
+        "debug" :   "\u001b[38;2;51;648;117m",
+        "info"  :   "\u001b[38;5;46m",
+        "warning":  "\u001b[38;2;255;120;0m",
+        "error" :   "\u001b[38;2;232;17;25m",
+        "critical": "\u001b[1;3;38;5;196m",
+        "trace":    "\u001b[38;5;105m",
+        "success":  "\u001b[1;3;38;2;182;255;150m",
+        "function": "\u001b[38;5;190m",
+        "end":      "\u001b[0m"
+    },
+    "evt_tag_map": {
+        "acc": ["a", "",  "",  "\u001b[38;5;106m"],
+        "adr": ["r", "@", "",  "\u001b[38;5;69m"],
+        "cls": ["c", "<", ">", "\u001b[38;5;99m"],
+        "dvc": ["d", "|", "|", "\u001b[38;5;200m"],
+        "err": ["e", "",  "!", "\u001b[1;3;38;2;232;17;25m"],
+        "fnc": ["f", "{", "}", "\u001b[38;5;190m"],
+        "tgt": ["", "",  "",   ""],
+        "lbl": ["l", "[", "]", ""],
+        "eid": ["", "",  "",   "\u001b[38;5;45m" ],
+        "msg": ["", "",  "",   ""],
+        "mem": ["", "",  "",   "\u001b[38;2;3;146;216m"],
+        "par": ["p", "",  "",  "\u001b[1;38;5;33m"],
+        "pid": ["i", "(", ")", "\u001b[38;5;135m"],
+        "src": ["s", "[", "]", "\u001b[38;5;57m"],
+        "ts":  ["t", "", "",   "\u001b[38;5;240m"],
+        "xtr": ["x", "", "",   "\u001b[1;38;2;255;232;74m"]
+    },
+    "filters": {
+        "quote":    "([^\"]*)",
+        "brac":     "<([^\"]+)>",
+        "err" :     "(\\w+Error:)",
+        "brackets": "(){}<>",
+        "line":     "(line \\d+)",
+        "func":     ", in\\s[\\w_]+",
+        "fn":       "\"([A-Za-z0-9_.-\/\\]+.[A-Za-z0-9_]+)\"",
+        "ip4" :     "\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b",
+        "web" :     "https?://[^\\s]+"
     }
 }
