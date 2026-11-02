@@ -1,11 +1,10 @@
-__VERSION__ = "0.5.0.107"
+__VERSION__ = "0.6.0.110"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 
-
 __main_file__  = 'ptcc_main.py'
 import sys
-__path = sys.path
+__path = sys.path[:]
 # Add the necessary paths to the system path
 sys.path.append('/lib/logger')
 sys.path.append('/lib/common')
@@ -32,15 +31,15 @@ try:
 
     from processor import Processor
 except Exception as ex:
+    print ('PTCC startup failed while importing dependencies:')
     sys.print_exception (ex)
     sys.path = __path
     del __path
-    print (f'{tc.critical}PTCC abnormal exit -> Error: {ex}{tc.end}\n')
-    machine.reset()
+    # Keep USB connected so the complete traceback can reach the REPL.
+    # Imports may have failed before machine or tc became available.
+    raise SystemExit
 
 __my_file_name         = 'ptcc_main.py'
-__version              = version_info ()
-__my_version           = __version.compact (__my_file_name)
 __file_io              = file_io (use_encryption=False, seed_file='', shift=0)
 __config: dict | None  = {}
 __logger: Logger       = None
@@ -51,7 +50,7 @@ __config_fn            = '/config/config.json'
 __help_fncs            = helpers ()
 __EXIT_DLY: int        = 5
 __is_shutting_down     = False
-__banner: str          = f'{tc.banner}                                     TopUp Client - PTCC {__my_version}                                      {tc.end}'
+__banner: str          = f'{tc.banner}                                   TopUp Client - PTCC {__VERSION__}                                    {tc.end}'
 
 def shutdown (hard_reset: bool = True, error: bool = False):
     _fnc_name = 'shutdown'
@@ -87,9 +86,9 @@ def shutdown (hard_reset: bool = True, error: bool = False):
             __logger.destructor()
             del __logger
     if error:
-        print (f'{tc.critical}PTCC {__my_version} terminated with error.{tc.end}\n')
+        print (f'{tc.critical}PTCC {__VERSION__} terminated with error.{tc.end}\n')
     else:
-        print (f'{tc.success}PTCC {__my_version} terminated gracefully.{tc.end}\n')
+        print (f'{tc.success}PTCC {__VERSION__} terminated gracefully.{tc.end}\n')
     gc.collect()
     # Reset the microcontroller
     if not hard_reset:
@@ -107,19 +106,19 @@ def init ():
     # Init the logger
     init_logger()
     # Initialise the logger
-    __logger.debug ({'msg': f'$p${__my_version}$p$ $a$constructor launched...$a$', 'cls': 'main', 'acc': tc.waiting})
+    __logger.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor launched...$a$', 'cls': 'main', 'acc': tc.waiting})
     __config = __file_io.load_json (__config_fn)
     if __config['get_time']:
         set_time()
     # Init the processor
     __processor = Processor (
         logger=__logger,
-        version=__version,
+        version=__VERSION__,
         file_io=__file_io,
         tc=tc,
         config=__config,
         cb_exit=shutdown,
-        name=f'{__config.get("self_name")} {__version.compact(__main_file__)}',
+        name=f'{__config.get("self_name")} {__VERSION__}',
         help_fncs=__help_fncs,
         dbg_lvls=dl)
     __logger.debug ({'msg': '$c$__main__$c$ $a$constructor finished$a$', 'src': __name__, 'fnc': None, 'acc': tc.success})
@@ -128,6 +127,7 @@ def init ():
 def init_logger ():
     global __logger
     global __config
+    _fnc_name = 'init_logger'
 
     try:
         # Load the logger configuration file
@@ -162,7 +162,7 @@ def init_logger ():
     except Exception as ex:
         print (f'{tc.critical}[critical] [{__name__} {_fnc_name}] {ex!s}{tc.end}')
         sys.print_exception (ex)
-        shutdown (hard_reset=True, error=True)
+        raise
 
 def set_time ():
     __rtc = machine.RTC()
@@ -185,7 +185,7 @@ def set_time ():
 gc.collect ()
 # Print out the product name and version
 print (__banner)
-del __banner
+__banner = None
 _fnc_name = 'main'
 if not __autostart:
     key = input("Enter 's' to start, 'q' to quit...")
@@ -199,7 +199,6 @@ else:
 try:
     # Initialise main objects
     init()
-    __version.destructor ()
     # Start the Processor
     if isinstance (__processor, Processor):
         __processor.start ()
@@ -211,4 +210,5 @@ except KeyboardInterrupt:
 except Exception as ex:
     print (f'{tc.bred}[critical] [{__name__}.{_fnc_name}] {type (ex)} -> {ex!s}{tc.end}')
     sys.print_exception (ex)
-    shutdown (hard_reset=True)
+    # Leave the failed startup available for inspection instead of resetting USB.
+    raise SystemExit

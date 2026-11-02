@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.6.0.4"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import gc
@@ -11,7 +11,10 @@ from   machine       import UART
 try:
     import usocket as socket
 except ImportError:
-    import socket
+    try:
+        import socket
+    except ImportError:
+        socket = None
 
 MAX_Q = 4
 __fileOperations = None
@@ -37,7 +40,6 @@ def get_time_stamp (ts_format) -> str:
 class FileHandler:
     def __init__ (self, filename: str,truncate: bool=True, max_log_size: int=20000, ts_format: str='%Y-%m-%d %H:%M:%S', name='', level='off'):
         global __fileOperations
-        global __ops_ref_cnt
         self._name           = name
         self._my_ver         = '2025.05.29.172438.12'
         self._log_fn         = filename
@@ -55,7 +57,6 @@ class FileHandler:
         self._ops_ref_cnt += 1
 
     def destructor (self):
-        global __fileOperations
         for formatter in self._formatters:
             if hasattr (formatter, 'destructor'):
                 formatter.destructor ()
@@ -70,7 +71,10 @@ class FileHandler:
         del self._file_ops
         # __fileOperations object counts the number of instantiations and only destroys itself if count is 0
         # This is to avoid memory leaks
-        __fileOperations.destructor ()
+        if self._ops_ref_cnt > 0:
+            self._ops_ref_cnt -= 1
+        else:
+            __fileOperations.destructor ()
         gc.collect()
 
     def __repr__ (self):
@@ -225,17 +229,11 @@ class FileOperations:
             # Check if dir exists, otherwise create
             self._create_log_dir (filename)
             # File does not exist
-            try:
-                with open (filename, 'a') as f:
-                    f.write (f'{get_time_stamp(self._ts_format)} ---------- Log file {filename} created ----------\n')
-            except OSError as ex:
-                raise ex
+            with open (filename, 'a') as f:
+                f.write (f'{get_time_stamp(self._ts_format)} ---------- Log file {filename} created ----------\n')
 
     def _delete_file (self, filename: str):
-        try:
-            os.remove (filename)
-        except OSError as ex:
-            raise ex
+        os.remove (filename)
 
     def _truncate_log_file (self, filename: str ):
         try:
@@ -424,6 +422,8 @@ class ConsoleHandler:
 ###############################################################################
 class SocketHandler:
     def __init__ (self, host: str, port: int, name='', level='off', timeout=2):
+        if socket is None:
+            raise ImportError ('SocketHandler requires firmware with socket support')
         self._host       = host
         self._port       = port
         self._name       = name
