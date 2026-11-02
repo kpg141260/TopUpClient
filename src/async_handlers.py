@@ -1,13 +1,13 @@
-__VERSION__ = "0.5.0.4"
+__VERSION__ = "0.6.0.5"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
-except:
+except ImportError:
     import asyncio
 try:
     import ujson as json
-except:
+except ImportError:
     import json
 import gc, sys, select
 from   machine import PWM, Pin
@@ -69,7 +69,7 @@ class AsyncHandlers:
         interval   = task_info.get ('pwm_interval', 0.2)
         try:
             self._led_pin = int (self._led_pin)
-        except:
+        except ValueError:
             raise ValueError (f'Invalid LED pin: $p${self._led_pin}$p$ - must be numeric!')
         self._led = PWM (self._led_pin, freq= task_info.get ('pwm_freq', 1000)) # type: ignore
         self.__log_task_started (name=name, task_info=task_info)
@@ -101,8 +101,7 @@ class AsyncHandlers:
         gc.collect()
         try:
             while True:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
-                    if gc.mem_free () < self._mem_threshold:
+                if self.task_register[name]['state'] != self.as_state.PAUSED and gc.mem_free () < self._mem_threshold:
                         gc.collect()
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
@@ -111,12 +110,10 @@ class AsyncHandlers:
     # ASYNC Function to read input character by character    
     async def as_key_read (self, name: str, task_info: dict):
         """Continuously read input character by character."""
-        interval = task_info.get ('intv', 0.1)
         self.__log_task_started (name=name, task_info=task_info)
         try:
             while True:
-                if not self._shutdown:
-                    if sys.stdin in select.select([sys.stdin], [], [], 0)[0] and not self._processing_cmd:  # Check 
+                if not self._shutdown and sys.stdin in select.select([sys.stdin], [], [], 0)[0] and not self._processing_cmd:  # Check 
                         await self._cmd_buffer.add_char(sys.stdin.read(1))
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
@@ -171,7 +168,7 @@ class AsyncHandlers:
                         and not self._uart.sync_active):
                     req = self._uart.read_line()
                     if req:
-                        self._log.debug({'msg': 'UART received: %s' % req.decode(self._encoding).strip()})
+                        self._log.debug({'msg': f'UART received: {req.decode(self._encoding).strip()}'})
                 await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling(name=name, task_info=task_info)
@@ -345,12 +342,10 @@ class AsyncHandlers:
                     self._log.warning ({'msg': f'Function $p${task_name}$p$ in class $p${cls_name}$p$ is not callable', 'src': __name__})
             except AttributeError:
                 self._log.warning ({'msg': f'Function $p${task_name}$p$ not found in class $p${cls_name}$p$', 'src': __name__})
-        return
+
 ########## ASYNCHRONOUS TEST METHODS ##########
     # ASYNC task to create error task
     async def as_error (self, name: str, task_info: dict):
-        interval = task_info.get ('interval', 10)
-        unit     = task_info.get ('unit', 'sec')
         self.__log_task_started (name=name, task_info=task_info)
         gc.collect()
         try:
@@ -368,10 +363,8 @@ class AsyncHandlers:
                 if cnt == 4:
                     raise TypeError (err)
                 if cnt == 5:
-                    raise Exception (err)
-                await asyncio.sleep (interval)
+                    raise MemoryError (err)
+                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
-            raise
-        except Exception as ex:
             raise

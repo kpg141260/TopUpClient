@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.7"
+__VERSION__ = "0.6.0.25"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012, BLE001, RUF010
 # -*- coding: utf-8 -*-
 import lib.common.check_fw as cfw
@@ -72,11 +72,11 @@ class TaskManager:
                 self._max_task_name_length = len (key) - 1
     def destructor (self):
         try:
-            del self.txt_task
-            del self.txt_tasks
-            del self.txt_async_func
-            del self.txt_cancelling
-            del self.txt_not_found
+            self.txt_task = None
+            self.txt_tasks = None
+            self.txt_async_func = None
+            self.txt_cancelling = None
+            self.txt_not_found = None
         finally:
             gc.collect()
 ########## CLASS PROPERTIES ##########

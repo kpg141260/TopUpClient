@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.8"
+__VERSION__ = "0.6.0.9"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, B012
 # -*- coding: utf-8 -*-
 import  gc
@@ -78,24 +78,25 @@ class UARTComms (UARTHelpersClient):
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             super().__destruct__()
             self._dvc_cnctd = False
-            del self._dvc_name
-            del self._dvc_ver
-            del self._encoding
-            del self._cmd
-            del self._challenge
-            del self._response
+            self._dvc_name = None
+            self._dvc_ver = None
+            self._encoding = None
+            self._cmd = None
+            self._challenge = None
+            self._response = None
         finally:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
-            del self._txt_construct
-            del self._txt_destruct
-            del self._txt_finish
-            del self._txt_failed
-            del self._txt_launch
-            del self._txt_rtc_sync
-            del self._txt_success
+            self._txt_construct = None
+            self._txt_destruct = None
+            self._txt_finish = None
+            self._txt_failed = None
+            self._txt_launch = None
+            self._txt_rtc_sync = None
+            self._txt_success = None
             gc.collect()
 
     def start ( self ) -> None:
+        gc.collect()
         health = self.thread_health()
         if health in ('starting', 'running'):
             return
@@ -112,12 +113,13 @@ class UARTComms (UARTHelpersClient):
             shared['state'] = 'starting'
             shared['last_progress'] = time.ticks_ms()
         try:
-            self._log.info ({'msg': f'$v$Core 1 thread$v$ launching -> Interval: $p${self._thread_interval}$p$', 'acc': self._tc.waiting})
+            self._log.info (f'Core 1 thread launching -> Interval: {self._thread_interval}')
             entry = self.__main_thread
             gc.collect()
             started = time.ticks_ms()
             while True:
                 try:
+                    gc.collect() # self._log.debug("None") # diagnostic instruction
                     _thread.start_new_thread (entry, ())
                     self._dvc_cnctd = False
                     self._time_synchronised = False
@@ -146,12 +148,12 @@ class UARTComms (UARTHelpersClient):
 
     def stop ( self ) -> None:
         self.disconnect('local stop', notify=True)
-        self._log.debug ({'msg': '$v$Core 1 thread$v$ $a$stopping...$a$', 'acc': self._tc.waiting})
+        self._log.debug ('Core 1 thread stopping...')
         with state_lock:
             shared['enabled'] = False
         stopped = self.stop_core1_graceful()
         state = '$a$stopped$a$' if stopped else '$a$NOT stopped$a$'
-        self._log.info ({'msg': f'$v$Core 1 thread$v$ {state}', 'acc': self._tc.critical})
+        self._log.info (f'Core 1 thread {state}')
 
     def pause_thread (self):
         self.disconnect('worker paused', notify=True)
@@ -241,7 +243,7 @@ class UARTComms (UARTHelpersClient):
         self._link.check_timeout()
 
     def sync_rtc (self, time_diff = 0):
-        return self._sync_rtc ()
+        return self._sync_rtc (time_diff)
 
     async def sync_rtc_async(self, time_diff=0):
         return await self._sync_rtc_async(time_diff)
