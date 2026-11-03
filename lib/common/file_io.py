@@ -1,5 +1,5 @@
-__VERSION__ = "0.5.0.2"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.3"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, S110, E722
 # -*- coding: utf-8 -*-
 try:
     import ujson as json # type: ignore
@@ -34,6 +34,7 @@ class FILE_IO:
         del self.txt_pde
         del self.txt_rde
         del self.txt_wte
+        
         del self.txt_type
         try:
             self._crypto.destructor()

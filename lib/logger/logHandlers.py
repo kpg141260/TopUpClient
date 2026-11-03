@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.4"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.8"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import gc
 import os
@@ -7,7 +7,7 @@ import time
 import ujson as json
 from   logger.logger import dbg_lvls
 from   collections   import deque
-from   machine       import UART
+from   lib.uart      import UARTComms
 try:
     import usocket as socket
 except ImportError:
@@ -41,7 +41,6 @@ class FileHandler:
     def __init__ (self, filename: str,truncate: bool=True, max_log_size: int=20000, ts_format: str='%Y-%m-%d %H:%M:%S', name='', level='off'):
         global __fileOperations
         self._name           = name
-        self._my_ver         = '2025.05.29.172438.12'
         self._log_fn         = filename
         self._formatters     = deque ([], MAX_Q)
         self._filters        = deque ([], MAX_Q)
@@ -78,7 +77,7 @@ class FileHandler:
         gc.collect()
 
     def __repr__ (self):
-        return f'{self.__class__.__name__} Ver.: ({self._my_ver})'
+        return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
 
     def __str__ (self):
         return f'{self.__class__.__name__}'
@@ -189,7 +188,7 @@ class FileOperations:
     def  init_file (self, filename: str, truncate: bool = False):
         _func_name = 'init_file'
         #TODO: correct disc space calculation
-        size, free, used = self._get_disc_space()
+        _, free, _ = self._get_disc_space()
         if free < self._min_disc_space / 2:
             self._min_disc_space = round (free / 2, -3)
         # Check available disc space
@@ -270,7 +269,7 @@ class FileOperations:
 # LOGGER UART HANDLER
 ###############################################################################
 class UartHandler:
-    def __init__ (self, uart, ts_format: str='%Y-%m-%d %H:%M:%S.%f', name='', level='off'):
+    def __init__ (self, uart: None = None, ts_format: str='%Y-%m-%d %H:%M:%S.%f', name='', level='off'):
         print (f'{'UartHandler'}.__init__ ({ts_format}, {name}, {level}, {dbg_lvls(level)})')
         self._uart       = uart
         self._ts_format  = ts_format
@@ -293,6 +292,9 @@ class UartHandler:
         gc.collect()
 
     def write (self, event_log):
+        if self._uart is None:
+            return
+        
         if self._level <= dbg_lvls.OFF:
             return
         if len (self._formatters) == 0:
@@ -306,7 +308,7 @@ class UartHandler:
         #            simply forward the raw event to the server
         # The comms uart class provides a buffer of 10 messages. If the buffer is full, the oldest entry will be dropped.
         event = {'log': event_log}
-        if isinstance (self._uart, UART):
+        if isinstance (self._uart, UARTComms):
             self._uart.write (json.dumps (event, separators=(',', ':')).encode('utf-8'))
         else:
             if self._uart.is_connected:
@@ -328,6 +330,11 @@ class UartHandler:
     def removeFilter (self, filter):
         if filter in self._filters:
             self._filters.remove (filter)
+            
+    def set_uart (self, uart: UARTComms):
+        if not isinstance (uart, UARTComms):
+            raise TypeError (f'Expected UARTComms instance, got {type(uart).__name__}')
+        self._uart = uart
 
     @property
     def name (self):
@@ -415,7 +422,7 @@ class ConsoleHandler:
 
     def flush(self):
         """Dummy flush method to support sys.stdout redirection."""
-        pass  # ✅ No-op to prevent errors
+        return  # ✅ No-op to prevent errors
 
 ###############################################################################
 # LOGGER SOCKET HANDLER

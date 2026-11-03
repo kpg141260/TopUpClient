@@ -1,12 +1,9 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.6.0.4"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
-try: 
-    import  gc, time, json, sys # type: ignore
-    from    machine import Pin # type: ignore
-    from    devices import Relay, TempSensor
-except Exception as ex:
-    raise
+import  gc, time, json, sys # type: ignore
+from    machine import Pin # type: ignore
+from    devices import Relay, TempSensor
 try:
     import uasyncio as asyncio # type: ignore
 except:
@@ -23,28 +20,24 @@ class TankController:
                 tc,
                 state: dict,
                 help_fcnts):
-        try:
-            self._my_ver = version.compact(__file__)
-            logger.debug ({'msg': f'Version: $p${self._my_ver}$p$ $a$constructor launched...$a$', 'cls': __class__, 'acc': tc.waiting})
-            self._tc               = tc
-            self._cnf: dict        = {}
-            self._log              = logger
-            self._helpers          = help_fcnts
-            self._tank_state: dict = state['tank']
-            self._tmp_state:  dict = state['tmp']
-            self._dvcs_state: dict = state['dvcs']
-            self._measuring: bool  = False
-            self._txt_refill       = 'refill'
-            self._txt_reservoir    = 'Reservoir'
-            self._txt_time         = 'time'
-            self._txt_measure      = 'measurement'
-            self._txt_elapsed      = 'Elapsed'
-            self._txt_temp         = 'Temperature'
-            self._txt_finished     = 'finished'
-            self._txt_started      = 'started'
-            self._unit_map         = {'C': 'Celsius', 'F': 'Fahrenheit', 'K': 'Kelvin'}
-        except Exception as ex:
-            raise ex
+        logger.debug ({'msg': f'Version: $p${__VERSION__}$p$ $a$constructor launched...$a$', 'cls': __class__, 'acc': tc.waiting})
+        self._tc               = tc
+        self._cnf: dict        = {}
+        self._log              = logger
+        self._helpers          = help_fcnts
+        self._tank_state: dict = state['tank']
+        self._tmp_state:  dict = state['tmp']
+        self._dvcs_state: dict = state['dvcs']
+        self._measuring: bool  = False
+        self._txt_refill       = 'refill'
+        self._txt_reservoir    = 'Reservoir'
+        self._txt_time         = 'time'
+        self._txt_measure      = 'measurement'
+        self._txt_elapsed      = 'Elapsed'
+        self._txt_temp         = 'Temperature'
+        self._txt_finished     = 'finished'
+        self._txt_started      = 'started'
+        self._unit_map         = {'C': 'Celsius', 'F': 'Fahrenheit', 'K': 'Kelvin'}
         try:
             # Open tank_controller configuration file
             self._cnf = file_io.load_json (cnf_fn)
@@ -79,10 +72,8 @@ class TankController:
             self.temp_sensor = TempSensor (config=self._cnf['ds18x20'], logger=logger, tc=self._tc, ver=version, enabled=self._cnf['ds18x20']['enabled'])
             self._cnf.clear()
             del self._cnf
-        except Exception as ex:
-            raise ex
         finally:
-            self._log.debug ({'msg': f'Version: $p${self._my_ver}$p$ $a$constructor {self._txt_finished}$a$', 'cls': __class__, 'acc': self._tc.success})
+            self._log.debug ({'msg': f'Version: $p${__VERSION__}$p$ $a$constructor {self._txt_finished}$a$', 'cls': __class__, 'acc': self._tc.success})
             gc.collect   ()
     # Class destructor
     def __destruct__ (self) -> bool:
@@ -91,7 +82,7 @@ class TankController:
         """
         global timer_simulate
         try:
-            self._log.debug ({'msg': f'Version: $p${self._my_ver}$p$ $a$destructor {self._txt_started}...$a$', 'cls': __class__, 'acc': self._tc.waiting})
+            self._log.debug ({'msg': f'Version: $p${__VERSION__}$p$ $a$destructor {self._txt_started}...$a$', 'cls': __class__, 'acc': self._tc.waiting})
             # Make sure relay are OFF
             self.relay_p.__destruct__()
             self.relay_v.__destruct__()
@@ -118,13 +109,13 @@ class TankController:
         except Exception as ex:
             self._log.error ({'msg': f'{ex}', 'src': __name__, 'cls': __class__, 'fnc': __name__})
         finally:
-            self._log.debug ({'msg': f'Version: $p${self._my_ver}$p$ $a$destructor finished$a$', 'cls': __class__, 'acc': self._tc.success})
+            self._log.debug ({'msg': f'Version: $p${__VERSION__}$p$ $a$destructor finished$a$', 'cls': __class__, 'acc': self._tc.success})
             gc.collect()
             return True
     def __version__ (self):
-        return self._my_ver
+        return __VERSION__
     def __repr__ (self):
-        return f'{self.__class__} Ver.: {self._my_ver}'
+        return f'{self.__class__} Ver.: {__VERSION__}'
     def __str__ (self):
         return f'{self.__class__}'
 

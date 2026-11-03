@@ -1,7 +1,6 @@
-__VERSION__ = "0.5.0.3"
+__VERSION__ = "0.6.0.4"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
-# This is the SERVER version of the UART Comms class
 import  gc, time
 import  json
 from    logger.logger    import dbg_lvls as dl 

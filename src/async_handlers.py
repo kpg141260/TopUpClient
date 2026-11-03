@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.4"
+__VERSION__ = "0.6.0.10"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, UP041, BLE001
 # -*- coding: utf-8 -*-
 try:
@@ -17,7 +17,6 @@ from   machine import PWM, Pin
 # which can be activated in async_tasks.json
 class AsyncHandlers:
     def __init__(self):
-        self._v_ah = self._ver.compact(__file__)
         self.__bind_async_fncs ()
         super().__init__()
 
@@ -230,7 +229,7 @@ class AsyncHandlers:
     async def as_uart_connect (self, name: str, task_info: dict):
         self.__log_task_started (name=name, task_info=task_info)
         gc.collect()
-        _rsp = {'cmd': {'act': 'hs', 'data': {'val': self._response, 'name': self.self._v_ah, 'to': self.task_register['as_update']['intv']}}}
+        _rsp = {'cmd': {'act': 'hs', 'data': {'val': self._response, 'name': 'ptcc', 'to': self.task_register['as_update']['intv']}}}
         _cmd = {}
         try:
             # Now wait for the client to connect
@@ -252,19 +251,19 @@ class AsyncHandlers:
                                 # Correct reply received from server - copy client information
                                 _info = _cmd['data']['name'].split (' ')
                                 if len (_info) > 1:
-                                    self._dvc_name = _info[0]
-                                    self._dvc_ver  = _info[1]
-                                    parts = self._dvc_ver.split('.')
+                                    self._ext_name = _info[0]
+                                    self._ext_ver  = _info[1]
+                                    parts = self._ext_ver.split('.')
                                     idx = len (parts)
-                                    self._dvc_build = f'{parts[idx-1]}'
+                                    self._ext_build = f'{parts[idx-1]}'
                                 else:
-                                    self._dvc_name  = _info[0]
-                                    self._dvc_build = 'na'
+                                    self._ext_name  = _info[0]
+                                    self._ext_build = 'na'
                                 # Adjust watchdog interval to client update frequency
                                 self.task_register['as_uart_watchdog']['intv'] = _rsp['data']['to'] * int (task_info['wd_multiplier'])
                                 self._uart.connected (True)
                                 self._uart.hs_active = False
-                                self._log.info ({'msg': f'$v$Device {self._dvc_name} - Build {self._dvc_build}$v$ connected; WD interval set to $p${self.task_register['as_uart_watchdog']['intv']} sec$p$'})
+                                self._log.info ({'msg': f'$v$Device {self._ext_name} - Build {self._ext_build}$v$ connected; WD interval set to $p${self.task_register['as_uart_watchdog']['intv']} sec$p$'})
                     except Exception as ex:
                         sys.print_exception (ex)
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])

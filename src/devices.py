@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.3"
+__VERSION__ = "0.6.0.4"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import onewire, ds18x20, time        # type: ignore
@@ -29,8 +29,7 @@ class Relay:
         ON = True
         OFF = False
 
-    def __init__(self, config: dict, logger, name: str, tc, ver, enabled) -> None:
-        self._my_ver = ver.compact(__file__)
+    def __init__(self, config: dict, logger, name: str, tc, enabled) -> None:
         self._name = name
         self._log = logger
         self._tc = tc
@@ -127,7 +126,7 @@ class Relay:
         self._enabled = value
         
 class TempSensor:
-    def __init__(self, config: dict, logger, tc, ver, enabled: bool, name='DS18X20'):
+    def __init__(self, config: dict, logger, tc, enabled: bool, name='DS18X20'):
         self._tc = tc
         self._enabled = enabled
         self._name = name

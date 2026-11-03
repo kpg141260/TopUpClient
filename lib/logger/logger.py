@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.6.0.3"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import  gc
@@ -97,10 +97,6 @@ class Logger:
         gc.collect ()
         _mem = gc.mem_free()
         self._name         = name
-        if version:
-            self._my_ver   = version.info (__file__)
-        else:
-            self._my_ver   = "2025.11.11.16"
         self._is_init      = False
         self._handlers     = deque ([], MAX_Q)
         self._lock_logger  = asyncio.Lock()
@@ -151,7 +147,7 @@ class Logger:
             print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129m__destruct__ finished...\u001b[0m')
             gc.collect()
     def __repr__ (self):
-        return f'{self.__class__.__name__} Ver.: ({self._my_ver})'
+        return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
     def __str__ (self):
         return f'{self.__class__.__name__}'
     def __load_and_check_log_config_file (self, log_cnf_fn: str):
