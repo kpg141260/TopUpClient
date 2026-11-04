@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.20"
+__VERSION__ = "0.6.0.8"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, B012
 # -*- coding: utf-8 -*-
 import  gc
@@ -39,9 +39,9 @@ class UARTComms (UARTHelpersClient):
             self._log       = logger
             self._tc        = tc
             self._my_info   = name # name of the server/client
-            self._dvc_name  = 'na' # name of the server/external device
-            self._dvc_ver   = 'na' # version of the server/external device
-            self._dvc_build = 'na' # build number of the server/external device
+            self._ext_name  = 'na' # name of the server/external device
+            self._ext_ver   = 'na' # version of the server/external device
+            self._ext_build = 'na' # build number of the server/external device
             self._ev_buffer = event_buffer
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             self._dvc_cnctd:       bool  = False # flag signalling whether the server device is connected
@@ -69,7 +69,7 @@ class UARTComms (UARTHelpersClient):
             if self._cnf:
                 # Clear comms configuration
                 self._cnf.clear()
-                del self._cnf
+                self._cnf = None
             gc.collect()
 
     def __destruct__ (self):
@@ -77,21 +77,21 @@ class UARTComms (UARTHelpersClient):
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             super().__destruct__()
             self._dvc_cnctd = False
-            del self._dvc_name
-            del self._dvc_ver
-            del self._encoding
-            del self._cmd
-            del self._challenge
-            del self._response
+            self._ext_name = None
+            self._ext_ver = None
+            self._encoding = None
+            self._cmd = None
+            self._challenge = None
+            self._response = None
         finally:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
-            del self._txt_construct
-            del self._txt_destruct
-            del self._txt_finish
-            del self._txt_failed
-            del self._txt_launch
-            del self._txt_rtc_sync
-            del self._txt_success
+            self._txt_construct = None
+            self._txt_destruct = None
+            self._txt_finish = None
+            self._txt_failed = None
+            self._txt_launch = None
+            self._txt_rtc_sync = None
+            self._txt_success = None
             gc.collect()
 
     def start ( self ) -> None:
@@ -274,16 +274,16 @@ class UARTComms (UARTHelpersClient):
 
     # returns the version of the client device
     def device_info ( self ):
-        return self._dvc_name + ' ' + self._dvc_ver
+        return self._ext_name + ' ' + self._ext_ver
 
     def device_name ( self ):
-        return self._dvc_name
+        return self._ext_name
 
     def device_version ( self ):
-        return self._dvc_ver
+        return self._ext_ver
 
     def device_build ( self ):
-        return self._dvc_build
+        return self._ext_build
 
     # Retrieve the device connection status
     @property

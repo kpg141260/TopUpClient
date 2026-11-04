@@ -5,16 +5,18 @@
         "host": "10.10.0.60",
         "port": "5514",
         "enable": {
-            "socket": true,
+            "socket": false,
             "file": false,
-            "console": true
+            "console": true,
+            "uart": true
         }
     },
     "tgt_dbg_lvls": {
         "logger":          "debug",
         "file_handler":    "info",
         "console_handler": "info",
-        "socket_handler":  "debug"
+        "socket_handler":  "debug",
+        "uart_handler":    "debug"
     },
     "dbg_lvl_map": {
         "OFF":      [-1, "off"],

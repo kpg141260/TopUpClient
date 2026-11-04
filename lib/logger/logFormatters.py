@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.3"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import time
 import io
@@ -36,7 +37,6 @@ class LogFormatter:
                  name=''):
         self._txt_dm        = ' \x1b[0m sub-dictionary missing'
         self._name          = name
-        self._my_ver        = '2025.10.06.18'
         self._log_col       = {}
         self._log_lbls      = {}
         self._log_conf      = log_fmt['settings'].copy()
@@ -127,7 +127,7 @@ class LogFormatter:
         del self._txt_dm
         gc.collect()
     def __repr__ (self):
-        return f'{self.__class__.__name__} Ver.: ({self._my_ver})'
+        return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
     def __str__ (self):
         return f'{self.__class__.__name__}'
     def format_output(self, event_log):

@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.8"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import gc
 import os
@@ -6,11 +7,14 @@ import time
 import ujson as json
 from   logger.logger import dbg_lvls
 from   collections   import deque
-from   machine       import UART
+from   lib.uart      import UARTComms
 try:
     import usocket as socket
 except ImportError:
-    import socket
+    try:
+        import socket
+    except ImportError:
+        socket = None
 
 MAX_Q = 4
 __fileOperations = None
@@ -36,9 +40,7 @@ def get_time_stamp (ts_format) -> str:
 class FileHandler:
     def __init__ (self, filename: str,truncate: bool=True, max_log_size: int=20000, ts_format: str='%Y-%m-%d %H:%M:%S', name='', level='off'):
         global __fileOperations
-        global __ops_ref_cnt
         self._name           = name
-        self._my_ver         = '2025.05.29.172438.12'
         self._log_fn         = filename
         self._formatters     = deque ([], MAX_Q)
         self._filters        = deque ([], MAX_Q)
@@ -54,7 +56,6 @@ class FileHandler:
         self._ops_ref_cnt += 1
 
     def destructor (self):
-        global __fileOperations
         for formatter in self._formatters:
             if hasattr (formatter, 'destructor'):
                 formatter.destructor ()
@@ -69,11 +70,14 @@ class FileHandler:
         del self._file_ops
         # __fileOperations object counts the number of instantiations and only destroys itself if count is 0
         # This is to avoid memory leaks
-        __fileOperations.destructor ()
+        if self._ops_ref_cnt > 0:
+            self._ops_ref_cnt -= 1
+        else:
+            __fileOperations.destructor ()
         gc.collect()
 
     def __repr__ (self):
-        return f'{self.__class__.__name__} Ver.: ({self._my_ver})'
+        return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
 
     def __str__ (self):
         return f'{self.__class__.__name__}'
@@ -184,7 +188,7 @@ class FileOperations:
     def  init_file (self, filename: str, truncate: bool = False):
         _func_name = 'init_file'
         #TODO: correct disc space calculation
-        size, free, used = self._get_disc_space()
+        _, free, _ = self._get_disc_space()
         if free < self._min_disc_space / 2:
             self._min_disc_space = round (free / 2, -3)
         # Check available disc space
@@ -224,17 +228,11 @@ class FileOperations:
             # Check if dir exists, otherwise create
             self._create_log_dir (filename)
             # File does not exist
-            try:
-                with open (filename, 'a') as f:
-                    f.write (f'{get_time_stamp(self._ts_format)} ---------- Log file {filename} created ----------\n')
-            except OSError as ex:
-                raise ex
+            with open (filename, 'a') as f:
+                f.write (f'{get_time_stamp(self._ts_format)} ---------- Log file {filename} created ----------\n')
 
     def _delete_file (self, filename: str):
-        try:
-            os.remove (filename)
-        except OSError as ex:
-            raise ex
+        os.remove (filename)
 
     def _truncate_log_file (self, filename: str ):
         try:
@@ -271,7 +269,7 @@ class FileOperations:
 # LOGGER UART HANDLER
 ###############################################################################
 class UartHandler:
-    def __init__ (self, uart, ts_format: str='%Y-%m-%d %H:%M:%S.%f', name='', level='off'):
+    def __init__ (self, uart: None = None, ts_format: str='%Y-%m-%d %H:%M:%S.%f', name='', level='off'):
         print (f'{'UartHandler'}.__init__ ({ts_format}, {name}, {level}, {dbg_lvls(level)})')
         self._uart       = uart
         self._ts_format  = ts_format
@@ -294,6 +292,9 @@ class UartHandler:
         gc.collect()
 
     def write (self, event_log):
+        if self._uart is None:
+            return
+        
         if self._level <= dbg_lvls.OFF:
             return
         if len (self._formatters) == 0:
@@ -307,7 +308,7 @@ class UartHandler:
         #            simply forward the raw event to the server
         # The comms uart class provides a buffer of 10 messages. If the buffer is full, the oldest entry will be dropped.
         event = {'log': event_log}
-        if isinstance (self._uart, UART):
+        if isinstance (self._uart, UARTComms):
             self._uart.write (json.dumps (event, separators=(',', ':')).encode('utf-8'))
         else:
             if self._uart.is_connected:
@@ -329,6 +330,11 @@ class UartHandler:
     def removeFilter (self, filter):
         if filter in self._filters:
             self._filters.remove (filter)
+            
+    def set_uart (self, uart: UARTComms):
+        if not isinstance (uart, UARTComms):
+            raise TypeError (f'Expected UARTComms instance, got {type(uart).__name__}')
+        self._uart = uart
 
     @property
     def name (self):
@@ -416,13 +422,15 @@ class ConsoleHandler:
 
     def flush(self):
         """Dummy flush method to support sys.stdout redirection."""
-        pass  # ✅ No-op to prevent errors
+        return  # ✅ No-op to prevent errors
 
 ###############################################################################
 # LOGGER SOCKET HANDLER
 ###############################################################################
 class SocketHandler:
     def __init__ (self, host: str, port: int, name='', level='off', timeout=2):
+        if socket is None:
+            raise ImportError ('SocketHandler requires firmware with socket support')
         self._host       = host
         self._port       = port
         self._name       = name

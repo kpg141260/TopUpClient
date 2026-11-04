@@ -1,10 +1,14 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.6.0.9"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, E722
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
 except:
     import asyncio
 import gc, time, sys
+from typing import ClassVar
+from logger.logger import Logger
+
 
 class TaskManager:
     class State:
@@ -17,8 +21,9 @@ class TaskManager:
         RECOVERING = 6
         FAILED     = 7
         UNKNOWN    = 8
+        SCHEDULED  = 9
 
-    S2T = {
+    S2T: ClassVar[dict[int, str]] = {
         0: 'disabled',
         1: 'running',
         2: 'paused',
@@ -27,10 +32,11 @@ class TaskManager:
         5: 'stopped',
         6: 'recovering',
         7: 'failed',
-        8: 'na'
+        8: 'na',
+        9: 'scheduled'
     }
 
-    interval_map = {
+    interval_map: ClassVar[dict[str, str]] = {
         'ms': 'milliseconds',
         's':  'seconds',
         'm':  'minutes',
@@ -41,12 +47,11 @@ class TaskManager:
     def __init__(self,
                  logger: Logger,  # type: ignore
                  version,
-                 tc: TextColors,  # type: ignore
+                 tc,  # type: ignore
                  task_register: dict,
                  cb_shutdown: callable): # type: ignore
         try:
-            self._v_tm = version.full(__file__)
-            logger.debug ({'msg': f'$p${version.compact(__file__)}$p$ $a$constructor launched...$a$', 'dvc': 'PTCC', 'ip': '0.0.0.0', 'cls': __class__, 'acc': tc.waiting})
+            logger.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor launched...$a$', 'dvc': 'PTCC', 'ip': '0.0.0.0', 'cls': __class__, 'acc': tc.waiting})
             gc.collect()
             self._mem                  = gc.mem_free()  # type: ignore
             self._log                  = logger
@@ -62,42 +67,37 @@ class TaskManager:
             self.txt_cancelling: str   = 'Cancelling'
             self.txt_not_found: str    = 'not found'
             # Calculate the interval multiplier mx based on the configured time unit
-            for task_name, task_info in self.task_register.items():
+            for task_name in self.task_register:
                 self.set_interval_multiplier(task_name)
                 # Ensure the task name is not too long
                 if len (task_name) > self._max_task_name_length:
                     self._max_task_name_length = len (task_name) - 1
-        except Exception as ex:
-            raise ex
         finally:
-            self._log.debug ({'msg': f'$p${self._v_tm}$p$ $a$constructor finished$a$ - mem free $p${gc.mem_free()} bytes$p$', 'cls': __class__, 'src': __name__, 'acc': self._tc.success})
+            self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor finished$a$ - mem free $p${gc.mem_free()} bytes$p$', 'cls': __class__, 'src': __name__, 'acc': self._tc.success})
             gc.collect()
     def destructor (self):
         try:
-            self._log.debug ({'msg': f'Version: $p${self._v_tm}$p$ $a$destructor launched...$a$', 'cls': __class__, 'acc': self._tc.waiting})
-            del self.txt_task
-            del self.txt_tasks
-            del self.txt_async_func
-            del self.txt_cancelling
-            del self.txt_not_found
-            self._log.debug ({'msg': f'Version: $p${self._v_tm}$p$ $a$destructor finished.$a$', 'cls': __class__, 'acc': self._tc.success})
-            del self._v_tm
-        except (Exception) as ex:
-            raise
+            self._log.debug ({'msg': f'Version: $p${__VERSION__}$p$ $a$destructor launched...$a$', 'cls': __class__, 'acc': self._tc.waiting})
+            self.txt_task = None
+            self.txt_tasks = None
+            self.txt_async_func = None
+            self.txt_cancelling = None
+            self.txt_not_found = None
+            self._log.debug ({'msg': f'Version: $p${__VERSION__}$p$ $a$destructor finished.$a$', 'cls': __class__, 'acc': self._tc.success})
         finally:
             gc.collect()
 ########## CLASS PROPERTIES ##########
     def __version (self):
-        return self._v_tm
+        return __VERSION__
     def __repr__ (self):
-        return f'{self.__class__} Ver.: ({self._v_tm})'
+        return f'{self.__class__} Ver.: ({__VERSION__})'
     def __str__ (self):
         return f'{self.__class__}'
 
 ########## TASK CREATION / RUNNING METHODS ##########
     def add_task (self, name: str):
         try:
-            for task_name in self.task_register.keys ():
+            for task_name in self.task_register:
                 if task_name == name:
                     task = self.task_register[task_name]['task']
                     if task and (not task.done() or self.task_register[task_name]['state'] == self.State.RUNNING):
@@ -112,73 +112,70 @@ class TaskManager:
                     self.create_task (task_name)
         except KeyError:
             self._log.warning ({'msg': f'{self.txt_task} $p$<{name}>$p$ {self.txt_not_found}', 'acc': self._tc.error})
-        except Exception as ex:
-            raise RuntimeError (ex)
+
     def create_task(self, task_name: str):
         # Create a task
-        try:
-            original_coro = self.task_register[task_name]['fnc']
-            interval      = self.task_register[task_name]['intv']
+        original_coro = self.task_register[task_name]['fnc']
+        interval      = self.task_register[task_name]['intv']
 
-            async def wrapped_coro(task_name=task_name, task_info=self.task_register[task_name]):
-                task_info.setdefault('_exc', None)
-                task_info.setdefault('rc', 0)
-                task_info.setdefault('mr', 5)
-                task_info.setdefault('crash_log', [])
-                task_info.setdefault('rc', 0)
-                while True:
-                    try:
-                        if task_info['state'] == self.State.RECOVERING:
-                            self._log.info({
-                                'msg': f'Task $f${task_name}$f$ recovered from crash $p$#{task_info["rc"]}$p$ and is {self.S2T[self.State.RUNNING]} again.',
-                                'acc': self._tc.success
-                            })
-                        task_info['state'] = self.State.RUNNING
-
-                        await original_coro (name=task_name, task_info=task_info)
-
-                        task_info['state'] = self.State.COMPLETED if task_info['state'] != self.State.STOPPED else self.State.STOPPED
-                        break  # Task finished normally
-                    except asyncio.CancelledError:
-                        task_info['state'] = self.State.CANCELLED
-                        raise
-                    except Exception as ex:
-                        task_info['_exc'] = ex
-                        task_info['rc'] += 1
-
-                        # Record crash log
-                        if len(task_info['crash_log']) >= 5:  # Keep only last 5
-                            task_info['crash_log'].pop(0)
-                        task_info['crash_log'].append((type(ex).__name__, str(ex)))
-
-                        task_info['state'] = self.State.RECOVERING
-
-                        self._log.warning({
-                            'msg': f'Task $f${task_name}$f$ $i${task_info["id"]}$i$ crashed with $x${repr(ex)}$x$ Retry $p${task_info["rc"]}/{task_info["mr"]}$p$',
-                            'acc': self._tc.bred
+        async def wrapped_coro(task_name=task_name, task_info=self.task_register[task_name]):
+            task_info.setdefault('_exc', None)
+            task_info.setdefault('rc', 0)
+            task_info.setdefault('mr', 5)
+            task_info.setdefault('crash_log', [])
+            task_info.setdefault('rc', 0)
+            while True:
+                try:
+                    if task_info['state'] == self.State.RECOVERING:
+                        self._log.info({
+                            'msg': f'Task $f${task_name}$f$ recovered from crash $p$#{task_info["rc"]}$p$ and is {self.S2T[self.State.RUNNING]} again.',
+                            'acc': self._tc.success
                         })
+                    task_info['state'] = self.State.RUNNING
 
-                        if task_info['rc'] >= task_info['mr']:
-                            task_info['state'] = self.State.FAILED
-                            self._log.critical({
-                                'msg': f'Task $f${task_name}$f$ $i${task_info["id"]}$i$ permanently failed after $p${task_info["rc"]}$p$ retries.'
-                            })
-                            break
-                    await asyncio.sleep(5)
+                    await original_coro (name=task_name, task_info=task_info)
 
-            task = asyncio.create_task(wrapped_coro())
-            self.task_register[task_name]['id']   = id(task)
-            self.task_register[task_name]['task'] = task
+                    task_info['state'] = self.State.COMPLETED if task_info['state'] != self.State.STOPPED else self.State.STOPPED
+                    break  # Task finished normally
+                except asyncio.CancelledError:
+                    task_info['state'] = self.State.CANCELLED
+                    raise
+                except Exception as ex:
+                    task_info['_exc'] = ex
+                    task_info['rc'] += 1
 
-            if not task.done():
-                txt = '$p$run-once$p$' if self.task_register[task_name]['ro'] else '$p$periodic$p$'
-                txt += f', Interval = $p${interval} {self.task_register[task_name].get('unit', 's')}$p$'
-                self._log.debug({
-                    'msg': f'$f${task_name}$f$, Id: $i${self.task_register[task_name]["id"]}$i$, Type: {txt} $a$has been created$a$',
-                    'acc': self._tc.success
-                })
-        except Exception as ex:
-            raise
+                    # Record crash log
+                    if len(task_info['crash_log']) >= 5:  # Keep only last 5
+                        task_info['crash_log'].pop(0)
+                    task_info['crash_log'].append((type(ex).__name__, str(ex)))
+
+                    task_info['state'] = self.State.RECOVERING
+
+                    self._log.warning({
+                        'msg': f'Task $f${task_name}$f$ $i${task_info["id"]}$i$ crashed with $x${repr(ex)}$x$ Retry $p${task_info["rc"]}/{task_info["mr"]}$p$',
+                        'acc': self._tc.bred
+                    })
+
+                    if task_info['rc'] >= task_info['mr']:
+                        task_info['state'] = self.State.FAILED
+                        self._log.critical({
+                            'msg': f'Task $f${task_name}$f$ $i${task_info["id"]}$i$ permanently failed after $p${task_info["rc"]}$p$ retries.'
+                        })
+                        break
+                await asyncio.sleep(5)
+
+        task = asyncio.create_task(wrapped_coro())
+        self.task_register[task_name]['id']   = id(task)
+        self.task_register[task_name]['task'] = task
+
+        if not task.done():
+            txt = '$p$run-once$p$' if self.task_register[task_name]['ro'] else '$p$periodic$p$'
+            txt += f', Interval = $p${interval} {self.task_register[task_name].get('unit', 's')}$p$'
+            self._log.debug({
+                'msg': f'$f${task_name}$f$, Id: $i${self.task_register[task_name]["id"]}$i$, Type: {txt} $a$has been created$a$',
+                'acc': self._tc.success
+            })
+
     def __create_all_tasks (self):
         self._log.debug ({'msg': f'$a$Initialising {self.txt_tasks} engine...$a$', 'acc': self._tc.waiting})
         for task_name, task_info in self.task_register.items():
@@ -205,7 +202,7 @@ class TaskManager:
             raise ValueError ('Task name must be provided')
         try:
             task = self.task_register[task_name]['task']
-            if task and self.task_register[task_name]['id'] is not 0:
+            if task and self.task_register[task_name]['id'] != 0:
                 try:
                     task.cancel() # Cancel the task
                     await task
@@ -229,7 +226,7 @@ class TaskManager:
     # Cancel all tasks
     # This function is called when the program is shutting down
     def cancel_all_tasks (self):
-        for task_name in self.task_register.keys ():
+        for task_name in self.task_register:
             if self.task_register[task_name]['id'] != 0 and self.task_register[task_name]['state'] == self.State.RUNNING:
                 self.cancel_task (task_name=task_name)
     # Pause a task by ID or task_name
@@ -260,7 +257,7 @@ class TaskManager:
         else:
             self._log.warning ({'msg': f'Task $f${task_name}$f$ is not running', 'acc': self._tc.warning})
     # Async Restart task a task by ID or task_name
-    async def restart_task_async(self, task_name: str = None):
+    async def restart_task_async(self, task_name: str | None = None):
         interval = 1
         delay    = 5
         await self.__cancel_task(task_name=task_name)
@@ -268,11 +265,10 @@ class TaskManager:
             delay -= interval
             await asyncio.sleep(1)  # Non-blocking sleep
         self.add_task(name=task_name)
-        return
     # Async wrapper to Restart a task by ID or task_name
-    def restart_task (self, task_name: str=None): # type: ignore
+    def restart_task (self, task_name: str | None=None): # type: ignore
         try:
-            loop = asyncio.get_event_loop()
+            _ = asyncio.get_event_loop()
             asyncio.create_task(self.restart_task_async(task_name=task_name))
         except RuntimeError:
             asyncio.run (self.restart_task_async(task_name=task_name))
@@ -280,15 +276,12 @@ class TaskManager:
     # Check if all tasks are done
     # This function is called when the program is shutting down
     def check_tasks_done (self):
-        try:
-            for task_name, task_info in self.task_register.items():
-                if self.task_register[task_name]['id'] is not 0:
-                    if not self.task_register[task_name]['task'].done():
-                        self._log.warning ({'msg': f'Task $f${task_name}$f$ $a$still {self.S2T[self.State.RUNNING]}$a$', 'acc': self._tc.waiting})
-                    else:
-                        self._log.info ({'msg': f'Task $f${task_name}$f$ $a${self.S2T[self.State.COMPLETED]}$a$', 'acc': self._tc.success})
-        except:
-            raise
+        for task_name in self.task_register:
+            if self.task_register[task_name]['id'] != 0:
+                if not self.task_register[task_name]['task'].done():
+                    self._log.warning ({'msg': f'Task $f${task_name}$f$ $a$still {self.S2T[self.State.RUNNING]}$a$', 'acc': self._tc.waiting})
+                else:
+                    self._log.info ({'msg': f'Task $f${task_name}$f$ $a${self.S2T[self.State.COMPLETED]}$a$', 'acc': self._tc.success})
     def task_status(self, task_name: str, task_info: dict, failed_only: bool = True):
         # Get the current task state - if not set, set to default
         try:
@@ -307,7 +300,7 @@ class TaskManager:
                 self._log.info ({'msg': msg})
         except Exception as ex:
             sys.print_exception (ex)
-            self._log.error ({'msg': f'{repr(ex)}', 'fnc': 'task_status'})
+            self._log.error ({'msg': f'{ex!r}', 'fnc': 'task_status'})
 
         # Retrieve crash log if task has failed
         if state == self.State.FAILED:
@@ -325,6 +318,7 @@ class TaskManager:
                 self._log.warning({'msg': f'Restarting $f${task_name}$f$ due to {color}{txt_state.upper()}{self._tc.end}'})
                 self.task_register[task_name]['rc'] = 0
                 self.restart_task(task_name)
+
     def task_status_all (self, failed_only: bool = True):
         tot     = len(self.task_register)
         dis     = 0
@@ -334,7 +328,7 @@ class TaskManager:
         fail    = 0
         stopped = 0
         for task_name, task_info in self.task_register.items():
-            if not task_info['run'] and not task_info.get('state') == self.State.RUNNING:
+            if not task_info['run'] and task_info.get('state') != self.State.RUNNING:
                 dis += 1
             else:
                 scd += 1
@@ -352,15 +346,17 @@ class TaskManager:
         msg = f'{self._tc.info}Total {self.txt_tasks}: $a${tot}$a${self._tc.info}, Scheduled $a${scd}$a$ {self._tc.info}, Running: {color}{act}{self._tc.info}, Stopped: {self._tc.critical}{stopped}{self._tc.info}, Paused: {self._tc.waiting}{psd} {self._tc.info}, Disabled: {self._tc.ts}{dis}{self._tc.info}, Failed: {colorf}{fail}{self._tc.end}'
         self._log.debug({'msg': msg, 'acc': self._tc.success})
         gc.collect()
+
     def get_task_state (self) -> dict:
         tasks = {}
         for task_name, task_info in self.task_register.items():
             tasks[task_name] = {'Status': task_info.get('state', 'unknown'), 'Failures': task_info.get('rc', 0)}
         return tasks
-    def __log_task_not_found (self, task_name: str=None, fnc: str=None): # type: ignore
+
+    def __log_task_not_found (self, task_name: str | None=None, fnc: str | None=None): # type: ignore
         if task_name is not None:
             self._log.warning ({'msg': f'$i${task_name}$i$ {self.txt_not_found}', 'fnc': fnc})
-        return
+
     @property
     def is_alive (self):
         return self.__is_alive
@@ -398,14 +394,14 @@ class TaskManager:
             if len (task_name) < 8:
                 task_name += ' ' * (8 - len (task_name))
             s =  f'{self._tc.success}{task_name:<{max_key_len}}\t'
-            s += f'{self._tc.id}{str (task_info['id']):<{max_val_len}}\t'
+            s += f'{self._tc.id}{task_info['id']!s:<{max_val_len}}\t'
             s += f'{self._tc.par}{task_type:<{max_val_len}}\t'
             i =  f'{task_info.get('intv', 0)} {task_info.get('unit', 's')}'
             s += f'{self._tc.info}{i:<{max_val_len}}\t'
             s += f'{color}{txt_state.upper()}{self._tc.end}'
             tab = '\t\t' if len (txt_state) < 8 else '\t'
             color = self._tc.critical if int (task_info['rc']) > 0 else self._tc.success
-            s += f'{color}{tab}{str (task_info["rc"]):<{max_val_len}}{self._tc.end}'
+            s += f'{color}{tab}{task_info["rc"]!s:<{max_val_len}}{self._tc.end}'
             self._log.aprint (s)
         del s
         gc.collect()
@@ -420,7 +416,7 @@ class TaskManager:
         return failed_tasks
     def get_failed_task_count(self):
         return len(self.get_failed_tasks())
-    def task_interval(self, task_name: str, params: list = []):
+    def task_interval(self, task_name: str, params: list | None = None):
         # Check that task exists
         if task_name in self.task_register:
             # Check if params are to be set or just to get current interval
@@ -431,7 +427,7 @@ class TaskManager:
                 return
             elif not is_int (params[0]) and not is_float (params[0]):
                 raise ValueError (f'Invalid type /{type(params[1])}/; must be int or float')
-            elif params[1] not in self.interval_map.keys():
+            elif params[1] not in self.interval_map:
                 raise ValueError (f'Invalid unit /{params[1]}/; must be one of {list(self.interval_map.keys())}')
             elif len (params) > 2:
                 raise ValueError (f'Too many parameters; expected 2, got /{len(params)}/')
@@ -484,7 +480,7 @@ class TaskManager:
         if self._shutdown:
             self.__is_alive = False
             self.cancel_all_tasks()
-            self._log.info ({'msg': f'$a$has terminated$a$', 'cls': __class__, 'acc': self._tc.success})
+            self._log.info ({'msg': '$a$has terminated$a$', 'cls': __class__, 'acc': self._tc.success})
     async def tm_main (self):
         _fnc_name = 'tm_main'
         try:
@@ -495,7 +491,7 @@ class TaskManager:
             self._log.debug ({'msg': f'$a$Memory used by$a$ $c${__class__}$c$ $p${self._mem - gc.mem_free()} bytes$p$', 'acc': self._tc.success}) # type: ignore
             while not self._shutdown:
                 await asyncio.sleep (3)
-            self._log.info ({'msg': f'$a$Shutdown request received$a$', 'cls': __class__, 'fnc': _fnc_name, 'acc': self._tc.waiting})
+            self._log.info ({'msg': '$a$Shutdown request received$a$', 'cls': __class__, 'fnc': _fnc_name, 'acc': self._tc.waiting})
         except KeyboardInterrupt as ex:
             self._log.trace ({'exc': ex, 'cls': __class__, 'fnc': _fnc_name})
             raise

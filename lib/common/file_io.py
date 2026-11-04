@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.4"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, S110, E722, BLE001
 # -*- coding: utf-8 -*-
 try:
     import ujson as json # type: ignore
@@ -33,6 +34,7 @@ class FILE_IO:
         del self.txt_pde
         del self.txt_rde
         del self.txt_wte
+        
         del self.txt_type
         try:
             self._crypto.destructor()
@@ -68,7 +70,7 @@ class FILE_IO:
             elif ex.args[0] == 13:
                 raise OSError (self.txt_pde.format (__name__, fn))
             raise
-        except Exception as ex:
+        except Exception:
             raise OSError (self.txt_rde.format (__name__, fn))
     
     def write (self, fn: str, data: str):

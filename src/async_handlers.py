@@ -1,12 +1,13 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.10"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, UP041, BLE001
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
-except:
+except ImportError:
     import asyncio
 try:
     import ujson as json
-except:
+except ImportError:
     import json
 import gc, sys, select
 from   machine import PWM, Pin
@@ -16,12 +17,9 @@ from   machine import PWM, Pin
 # which can be activated in async_tasks.json
 class AsyncHandlers:
     def __init__(self):
-        try:
-            self._v_ah = self._ver.compact(__file__)
-            self.__bind_async_fncs ()
-            super.__init__()
-        except Exception as ex:
-            raise ex
+        self.__bind_async_fncs ()
+        super().__init__()
+
 ########## ASYNCHRONOUS TASK DEFINITIONS ##########
     # ASYNC Function to check the tank
     async def as_tank_check (self, name: str, task_info: dict):
@@ -72,7 +70,7 @@ class AsyncHandlers:
         interval   = task_info.get ('pwm_interval', 0.2)
         try:
             self._led_pin = int (self._led_pin)
-        except:
+        except ValueError:
             raise ValueError (f'Invalid LED pin: $p${self._led_pin}$p$ - must be numeric!')
         self._led = PWM (self._led_pin, freq= task_info.get ('pwm_freq', 1000)) # type: ignore
         self.__log_task_started (name=name, task_info=task_info)
@@ -105,8 +103,7 @@ class AsyncHandlers:
         try:
             while True:
                 if self.task_register[name]['state'] != self.as_state.PAUSED:
-                    if gc.mem_free () < self._mem_threshold:
-                        gc.collect()
+                    gc.collect()
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
@@ -114,12 +111,10 @@ class AsyncHandlers:
     # ASYNC Function to read input character by character    
     async def as_key_read (self, name: str, task_info: dict):
         """Continuously read input character by character."""
-        interval = task_info.get ('intv', 0.1)
         self.__log_task_started (name=name, task_info=task_info)
         try:
             while True:
-                if not self._shutdown:
-                    if sys.stdin in select.select([sys.stdin], [], [], 0)[0] and not self._processing_cmd:  # Check 
+                if not self._shutdown and sys.stdin in select.select([sys.stdin], [], [], 0)[0] and not self._processing_cmd:  # Check 
                         await self._cmd_buffer.add_char(sys.stdin.read(1))
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
@@ -173,13 +168,11 @@ class AsyncHandlers:
             while True:
                 if not self.task_register['as_uart_cmd']['psd']:
                     req = self._uart.read_line ()
-                    if req:
-                        if isinstance (req, bytearray):
-                            if req != b'':
-                                self._log.debug ({'msg': f'as_uart_cmd received: $p${req.decode(self._encoding).strip()}$p$'})
-                                # await self._convert_uart_cmd (json.loads (req.decode(self._encoding)))
-                                del req
-                                self._uart_watchdog_event.set ()
+                    if req and isinstance (req, bytearray) and req != b'':
+                        self._log.debug ({'msg': f'as_uart_cmd received: $p${req.decode(self._encoding).strip()}$p$'})
+                        # await self._convert_uart_cmd (json.loads (req.decode(self._encoding)))
+                        del req
+                        self._uart_watchdog_event.set ()
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
@@ -198,7 +191,7 @@ class AsyncHandlers:
                     # Event received in time, reset and keep waiting
                     self._uart_watchdog_event.set()          
             except asyncio.TimeoutError:
-                self._log.warning ({'msg': f'Watchdog timeout! $a$Trying to recover...$a$', 'src': __name__, 'acc': self._tc.waiting})
+                self._log.warning ({'msg': 'Watchdog timeout! $a$Trying to recover...$a$', 'src': __name__, 'acc': self._tc.waiting})
                 if self.task_register['as_uart_cmd']['state'] == self.as_state.RUNNING: self.task_manager.cancel_task (task_name='as_uart_cmd')
                 if self.task_register['as_rtc_sync']['state'] == self.as_state.RUNNING: self.task_manager.cancel_task (task_name='as_rtc_sync')
                 self.task_manager.cancel_task (task_name='as_uart_connect')
@@ -236,11 +229,11 @@ class AsyncHandlers:
     async def as_uart_connect (self, name: str, task_info: dict):
         self.__log_task_started (name=name, task_info=task_info)
         gc.collect()
-        _rsp = {'cmd': {'act': 'hs', 'data': {'val': self._response, 'name': self.self._v_ah, 'to': self.task_register['as_update']['intv']}}}
+        _rsp = {'cmd': {'act': 'hs', 'data': {'val': self._response, 'name': 'ptcc', 'to': self.task_register['as_update']['intv']}}}
         _cmd = {}
         try:
             # Now wait for the client to connect
-            self._log.info ({'msg': f'$a$Waiting for server to connect...$a$', 'acc': self._tc.waiting})
+            self._log.info ({'msg': '$a$Waiting for server to connect...$a$', 'acc': self._tc.waiting})
             # Set the uart handshake state to active
             self._uart.hs_active = True
             # Signal to server that client is ready to communicate
@@ -258,24 +251,22 @@ class AsyncHandlers:
                                 # Correct reply received from server - copy client information
                                 _info = _cmd['data']['name'].split (' ')
                                 if len (_info) > 1:
-                                    self._dvc_name = _info[0]
-                                    self._dvc_ver  = _info[1]
-                                    parts = self._dvc_ver.split('.')
+                                    self._ext_name = _info[0]
+                                    self._ext_ver  = _info[1]
+                                    parts = self._ext_ver.split('.')
                                     idx = len (parts)
-                                    self._dvc_build = f'{parts[idx-1]}'
+                                    self._ext_build = f'{parts[idx-1]}'
                                 else:
-                                    self._dvc_name  = _info[0]
-                                    self._dvc_build = 'na'
+                                    self._ext_name  = _info[0]
+                                    self._ext_build = 'na'
                                 # Adjust watchdog interval to client update frequency
                                 self.task_register['as_uart_watchdog']['intv'] = _rsp['data']['to'] * int (task_info['wd_multiplier'])
                                 self._uart.connected (True)
                                 self._uart.hs_active = False
-                                self._log.info ({'msg': f'$v$Device {self._dvc_name} - Build {self._dvc_build}$v$ connected; WD interval set to $p${self.task_register['as_uart_watchdog']['intv']} sec$p$'})
+                                self._log.info ({'msg': f'$v$Device {self._ext_name} - Build {self._ext_build}$v$ connected; WD interval set to $p${self.task_register['as_uart_watchdog']['intv']} sec$p$'})
                     except Exception as ex:
                         sys.print_exception (ex)
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
-            else:
-                pass
             raise asyncio.CancelledError
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
@@ -299,24 +290,28 @@ class AsyncHandlers:
                             time_diff = self._uart.sync_rtc (time_diff)
                         if first_run:
                             # Now that the rtc has been synchronised set to a lower frequency
-                            self._log.debug ({'msg': f'RTC sync interval changed from: $p${interval} sec$p$ to: $p${frequency} sec$p$'})
+                            self._log.debug ({'msg': f'RTC sync interval changed from: $p${self.task_register[name]['intv']} sec$p$ to: $p${self.task_register[name]['freq']} sec$p$'})
                             self.task_register[name]['intv'] = self.task_register[name]['freq']
                             first_run = False
                         if self._uart.is_synchronised:
                             self._uart.sync_active = False
-                            raise asyncio.CancelledError
+                            is_synced = True
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                if is_synced:
+                    self._uart.sync_active = False
+                    break
             else:
                 self.task_manager.add_task (name='as_uart_cmd')
                 self.task_manager.add_task (name='as_uart_watchdog')
                 # Activate watchdog event
                 self._uart_watchdog_event.set ()
+                raise asyncio.CancelledError
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise
         except Exception as ex:
             sys.print_exception (ex)
-            raise ex
+            raise
     # ASYNC Update server via socket, default every 10 seconds 
     async def as_update ( self, name: str, task_info: dict):
         self.__log_task_started (name=name, task_info=task_info)
@@ -360,8 +355,6 @@ class AsyncHandlers:
                 raise
     # Async function to check thread status
     async def as_thread_monitor (self, name: str, task_info: dict):
-        interval = task_info.get ('intv', 10)
-        unit     = task_info.get ('unit', 's')
         self.__log_task_started (name=name, task_info=task_info)
         gc.collect()
         try:
@@ -441,15 +434,15 @@ class AsyncHandlers:
 ########## HELPER METHODS ##########
     def __log_task_started (self, name: str, task_info: dict):
         if task_info['id'] == 0:
-            try:
-                task_info['id'] = self.task_register.get(name, {}).get('task_id', 0)
-            except:
-                pass
+            task_info['id'] = self.task_register.get(name, {}).get('task_id', 0)
+            
         self._log.info ({'msg': f'$f${name}$f$ $i${task_info['id']}$i$ $a$has started$a$. Interval = $p${task_info['intv']} sec$p$', 'acc': self._tc.success})
     def __log_task_cancelling (self, name: str, task_info: dict):
         self._log.debug ({'msg': f'$f${name}$f$ $i${task_info['id']}$i$$a$ cancelled$a$', 'acc': self._tc.warning})
+        
     def __log_task_paused (self, name: str, task_info: dict):
         self._log.info ({'msg': f'$f${name}$f$ $i${task_info['id']}$i$$a$ {self.as_state.PAUSED}$a$', 'acc': self._tc.waiting})
+        
     def __bind_async_fncs (self):
         for task_name, task_info in self.task_register.items():
             cls_name = task_info.get ('cls', None)
@@ -467,12 +460,10 @@ class AsyncHandlers:
                     self._log.warning ({'msg': f'Function $p${task_name}$p$ in class $p${cls_name}$p$ is not callable', 'src': __name__})
             except AttributeError:
                 self._log.warning ({'msg': f'Function $p${task_name}$p$ not found in class $p${cls_name}$p$', 'src': __name__})
-        return
 ########## ASYNCHRONOUS TEST METHODS ##########
     # ASYNC task to create error task
     async def as_error (self, name: str, task_info: dict):
         interval = task_info.get ('interval', 10)
-        unit     = task_info.get ('unit', 'sec')
         self.__log_task_started (name=name, task_info=task_info)
         gc.collect()
         try:
@@ -481,19 +472,15 @@ class AsyncHandlers:
             while True:
                 if cnt == 0:
                     raise KeyError (err)
-                if cnt == 1:
+                elif cnt in (1, 5):
                     raise ValueError (err)
-                if cnt == 2:
+                elif cnt == 2:
                     raise ZeroDivisionError (err)
-                if cnt == 3:
+                elif cnt == 3:
                     raise OSError (err)
-                if cnt == 4:
+                elif cnt == 4:
                     raise TypeError (err)
-                if cnt == 5:
-                    raise Exception (err)
                 await asyncio.sleep (interval)
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
-            raise
-        except Exception as ex:
             raise

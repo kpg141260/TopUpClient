@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.12"
+__VERSION__ = "0.6.0.4"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import _thread
@@ -55,21 +55,21 @@ class FullDuplexUART:
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             self._uart.deinit()
-            del self._uart
-            del self._encoding
-            del self.rx_buffer
-            del self.tx_buffer
-            del self._parity_map
-            del self.lock
+            self._uart = None
+            self._encoding = None
+            self.rx_buffer = None
+            self.tx_buffer = None
+            self._parity_map = None
+            self.lock = None
         finally:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
-            del self._txt_construct
-            del self._txt_destruct
-            del self._txt_finish
-            del self._txt_failed
-            del self._txt_launch
-            del self._txt_rtc_sync
-            del self._txt_success
+            self._txt_construct = None
+            self._txt_destruct = None
+            self._txt_finish = None
+            self._txt_failed = None
+            self._txt_launch = None
+            self._txt_rtc_sync = None
+            self._txt_success = None
             gc.collect()
 
     # Initialise the UART

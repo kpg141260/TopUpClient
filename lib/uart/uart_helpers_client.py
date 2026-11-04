@@ -1,36 +1,32 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.5"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, E722
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
 except:
     import asyncio
-try:
-    import time, json, gc, sys, machine
-    from uart_thread import UARTthread
-except Exception as ex:
-    raise
+import time, json, gc, sys, machine
+from uart_thread import UARTthread
 
 class UARTHelpersClient (UARTthread):
     ################# INITIALIZATION AND DESTRUCTION #################
     def __init__(self, logger, cnf, tc, version):
         try:
-            self._log.debug ({'msg': f'$p${self._my_ver}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
+            self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             super().__init__(logger, cnf, tc, version)
-            self._log.debug ({'msg': f'$p${self._my_ver}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
+            self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
         except (Exception) as ex:
-            self._log.critical ({'msg': f'$p${self._my_ver}$p$ {self._txt_construct} {self._txt_failed}', 'cls': __class__})
+            self._log.critical ({'msg': f'$p${__VERSION__}$p$ {self._txt_construct} {self._txt_failed}', 'cls': __class__})
             raise
         finally:
             gc.collect()
 
     def __destruct__ (self):
         try:
-            self._log.debug ({'msg': f'$p${self._my_ver}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
+            self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             super().__destruct__()
-        except (Exception) as ex:
-            raise
         finally:
-            self._log.debug ({'msg': f'$p${self._my_ver}$p$ $a${self._txt_destruct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
+            self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
             gc.collect()
 
     # Function to synchronise time between server and client
