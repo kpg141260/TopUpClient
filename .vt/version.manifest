@@ -53,11 +53,11 @@
         "mtime": "2026-11-02 13:10:22"
     },
     "src/task_manager.py": {
-        "build": 5,
-        "hash": "d326cd40b3591ee7597abbc7cfd187170fb8baa5c62a9f6880d73e5660f0a946",
+        "build": 9,
+        "hash": "5f85f609f79a7948de1bbcac8dfa58ad6d03df354769d081523ecdf9134bf04d",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-11-03 11:46:42"
+        "mtime": "2026-11-03 17:48:46"
     },
     "lib/common/regex_filters.mpy": {
         "build": 1,
@@ -81,18 +81,18 @@
         "mtime": "2026-05-05 13:22:30"
     },
     "src/async_handlers.py": {
-        "build": 8,
-        "hash": "a467fa4d88e7c73f222beeb3b385a80223e75a63cfd390e05fa4a581106ceb22",
+        "build": 10,
+        "hash": "20278f0307789d8c88b19325db43a8352703ea9653e1d51e4c58b6a6fcd328d3",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-11-03 15:19:38"
+        "mtime": "2026-11-03 17:38:45"
     },
     "lib/common/file_io.py": {
-        "build": 3,
-        "hash": "a53ef56cbd2bf66850f63f9f3ec34d5291a9b800fb1afc5decfe0bb62de7c112",
+        "build": 4,
+        "hash": "d40229bb815ab7d03a077d1c95a9b42550a46642d34f537e188c550513cb0e44",
         "has_changes": true,
         "ctime": "2026-06-09 09:47:42",
-        "mtime": "2026-11-03 15:22:45"
+        "mtime": "2026-11-03 17:50:00"
     },
     "src/tank_controller.py": {
         "build": 4,
@@ -137,11 +137,11 @@
         "mtime": "2026-11-02 13:10:22"
     },
     "src/processor.py": {
-        "build": 5,
-        "hash": "5bdad5152ea8c71e531ff5f7848892bdd2e1c00b4fb05f255f4350d8e9af606f",
+        "build": 7,
+        "hash": "05329316615786856012387cda80360cc6ff855304ee51ce84460349f40a08ac",
         "has_changes": true,
         "ctime": "2026-05-05 13:22:57",
-        "mtime": "2026-11-03 11:26:11"
+        "mtime": "2026-11-03 17:54:08"
     },
     "lib/uart/uart_full_duplex.py": {
         "build": 4,

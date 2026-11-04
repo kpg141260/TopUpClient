@@ -1,29 +1,29 @@
-__VERSION__ = "0.6.0.5"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
+__VERSION__ = "0.6.0.7"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, E722
 # -*- coding: utf-8 -*-
 ########## CLASS IMPORTS ##########
 import sys
+import os
 try:
     import uasyncio as asyncio
-except ImportError:
+except:
     import asyncio
 try:
     import ujson as json
-except ImportError:
+except:
     import json
 
 import gc, select, re
 from   machine          import Pin, PWM, RTC
 from   collections      import OrderedDict
 try:
-    
-    from   tank_controller   import TankController
-    from   helpers           import helpers, FixedSizeFIFO as FIFO
-    from   uart.uart         import UARTComms
-    from   lib.logger.logger import Logger
-    from   task_manager      import TaskManager
-    from   async_handlers    import AsyncHandlers
-    from   cmd_handlers      import CommandHandlers
+    from   tank_controller  import TankController
+    from   helpers          import helpers, FixedSizeFIFO as FIFO
+    from   uart.uart        import UARTComms
+    from   logger.logger    import Logger
+    from   task_manager     import TaskManager
+    from   async_handlers   import AsyncHandlers
+    from   cmd_handlers     import CommandHandlers
 except Exception as ex:
     sys.print_exception (ex)
     raise ImportError (f'{__name__}: {ex}')
@@ -44,7 +44,7 @@ class Processor (CommandHandlers, AsyncHandlers):
         self._log   = logger
         self._fio   = file_io
         self._tc    = tc
-        self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor launched...$a$', 'cls': __class__, 'src': __name__, 'acc': self._tc.waiting})
+        self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor launched...$a$', 'cls': __class__, 'cls': __class__, 'src': __name__, 'acc': self._tc.waiting})
         self._cmd_buffer  = AsyncUARTBuffer(self._log.reader_lock(),logger.aReader())
         if cb_exit is None:
             raise ValueError (f'{'init'}: Parameter cb_exit cannot be None!')
@@ -97,36 +97,40 @@ class Processor (CommandHandlers, AsyncHandlers):
         try:
             # Shared event to reset the watchdog
             self._uart_watchdog_event = asyncio.ThreadSafeFlag()
-            self._tank_ctrl = TankController (logger=logger, 
-                                              version=version, 
-                                              file_io=file_io, 
-                                              cnf_fn=config['files']['tank_config'], 
-                                              tc=self._tc, 
-                                              state=self.state, 
-                                              help_fcnts=help_fncs)
+            self._tank_ctrl = TankController (
+                logger=logger, 
+                file_io=file_io, 
+                cnf_fn=config['files']['tank_config'], 
+                tc=self._tc, 
+                state=self.state, 
+                help_fcnts=help_fncs
+            )
             self._class_map.setdefault ('TankController', self._tank_ctrl)
-            self._uart = UARTComms (logger=logger, 
-                                      version=version,
-                                      file_io=file_io, 
-                                      cnf_fn=config['files']['comms'], 
-                                      tc=self._tc, 
-                                      event_buffer=self._ev_buffer)
+            self._uart = UARTComms (
+                logger=logger, 
+                file_io=file_io, 
+                cnf_fn=config['files']['comms'], 
+                tc=self._tc,
+                name=os.uname().machine,
+                event_buffer=self._ev_buffer
+            )
             self._mem_threshold = (gc.mem_free() + gc.mem_alloc()) // 4
             gc.threshold (self._mem_threshold)
             self._log.info ({'msg': f'$a$Memory threshold set$a$ $p$@ {self._mem_threshold} bytes$p$', 'acc': self._tc.success, 'src': __name__})
             self.__bind_async_fncs()
-            self.task_manager = TaskManager (logger=self._log, 
-                                             version=version, 
-                                             tc=self._tc, 
-                                             task_register=self.task_register, 
-                                             cb_shutdown=self.shutdown)
+            self.task_manager = TaskManager (
+                logger=self._log, 
+                    tc=self._tc, 
+                    task_register=self.task_register, 
+                    cb_shutdown=self.shutdown
+                )
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor finished$a$', 'cls': __class__, 'src': __name__, 'acc': self._tc.success})
         except Exception as ex:
             self._log.trace ({'exc': ex, 'cls': __class__, 'src': __name__})
             raise
         finally:
             self._class_map.clear()
-            del self._class_map 
+            self._class_map = None
             gc.collect()
     ###### METHODS ######
     def __bind_async_fncs (self):
@@ -155,23 +159,22 @@ class Processor (CommandHandlers, AsyncHandlers):
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a$destructor launched...$a$', 'cls': __class__, 'src': __name__, 'acc': self._tc.waiting})
             # Delete asynchronous task manager
             if self.task_manager is not None:
-                del self.task_manager
+                self.task_manager = None
             self.task_register.clear()
-            del self.task_register
-            del self._uart_watchdog_event
-            del self._tank_ctrl
+            self.task_register = None
+            self._uart_watchdog_event = None
+            self._tank_ctrl = None
             for key in self.state:
                 self.state[key].clear()
             self.state.clear()
-            del self.state
-            del self._ev_buffer
-            del self._cmd_buffer
-            del self._input
-            del self._uart
-            del self._encoding
-            del self._fn_cmd_dict
+            self.state = None
+            self._ev_buffer = None
+            self._cmd_buffer = None
+            self._input = None
+            self._uart = None
+            self._encoding = None
+            self._fn_cmd_dict = None
             self._log.debug ({'msg': f'$p${__class__}$p$ $a$destructor finished...$a$', 'cls': __class__, 'acc': self._tc.success})
-            del __VERSION__
             self._destructed = True
             gc.collect()
 
@@ -194,7 +197,6 @@ class Processor (CommandHandlers, AsyncHandlers):
             if cmd_type == 'cmd':
                 request = [target, device, action, data]
             elif cmd_type == 'req':
-                # TODO: Implement request handling logic here
                 token = cmd.get(cmd_type).get('tok', None)
             elif cmd_type == 'msg':
                 # Print the message and return
@@ -324,7 +326,7 @@ class Processor (CommandHandlers, AsyncHandlers):
             if self._uart is not None:
                 self._uart.shutdown ()
             # Shutdown and cleanup Task Manager
-            if self.task_manager is not None and self.task_manager.is_alive:
+            if self.task_manager and self.task_manager.is_alive:
                     self.task_manager.shutdown()
                     self.task_manager.check_tasks_done()
                     self.task_manager.destructor()
@@ -342,7 +344,7 @@ class Processor (CommandHandlers, AsyncHandlers):
         self._log.aprint (f'\n{self._tc.ul}{self._tc.yellow}Allocated Memory: {self._tc.par}{self.state['sys']['srvr']['mem_a']}{self._tc.end}')
         self._log.aprint (f'\n{self._tc.ul}{self._tc.yellow}Free Memory: {self._tc.par}{self.state['sys']['srvr']['mem_f']}{self._tc.end}')
         self._log.aprint (f'\n{self._tc.ul}{self._tc.yellow}Server CPU Temperature{self._tc.par}{self.state['sys']['srvr']['c_tmp']}{self._tc.end}')
-    def task_interval (self, task_name: str, params: list | None = None):
+    def task_interval (self, task_name: str, params: list = []):
         self.task_manager.task_interval (task_name=task_name, params=params)
     def dir_async_fnc (self, cls_name: str):
         return [name for name in dir(cls_name) if callable(getattr(cls_name, name)) and name.startswith('as_')]
