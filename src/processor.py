@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.7"
+__VERSION__ = "0.6.0.8"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, E722
 # -*- coding: utf-8 -*-
 ########## CLASS IMPORTS ##########
@@ -44,7 +44,7 @@ class Processor (CommandHandlers, AsyncHandlers):
         self._log   = logger
         self._fio   = file_io
         self._tc    = tc
-        self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor launched...$a$', 'cls': __class__, 'cls': __class__, 'src': __name__, 'acc': self._tc.waiting})
+        self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor launched...$a$', 'cls': __class__, 'src': __name__, 'acc': self._tc.waiting})
         self._cmd_buffer  = AsyncUARTBuffer(self._log.reader_lock(),logger.aReader())
         if cb_exit is None:
             raise ValueError (f'{'init'}: Parameter cb_exit cannot be None!')

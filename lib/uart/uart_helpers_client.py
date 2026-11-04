@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.5"
+__VERSION__ = "0.6.0.7"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, E722
 # -*- coding: utf-8 -*-
 try:
@@ -7,15 +7,19 @@ except:
     import asyncio
 import time, json, gc, sys, machine
 from uart_thread import UARTthread
+from uart_link import UARTLink
 
 class UARTHelpersClient (UARTthread):
     ################# INITIALIZATION AND DESTRUCTION #################
-    def __init__(self, logger, cnf, tc, version):
+    def __init__(self, logger, cnf, tc):
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
-            super().__init__(logger, cnf, tc, version)
+            self._link = UARTLink(self._my_info, False, cnf, lambda message: self._uart.send_line(message),
+                                  self.__push_event, self._link_changed)
+            super().__init__(logger, cnf, tc)
+            self._uart._push_event = self.__push_event
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
-        except (Exception) as ex:
+        except (Exception):
             self._log.critical ({'msg': f'$p${__VERSION__}$p$ {self._txt_construct} {self._txt_failed}', 'cls': __class__})
             raise
         finally:
@@ -30,33 +34,27 @@ class UARTHelpersClient (UARTthread):
             gc.collect()
 
     # Function to synchronise time between server and client
-    def _sync_rtc  (self):
-        # This code is only launched by the main thread after the server has synchronised its own RTC with a NTP server.
-        _rtc = machine.RTC()
+    def _sync_rtc(self, message=None):
+        if message is None:
+            self.read_line()
+            return 0 if self._time_synchronised else None
         try:
-            cmd = self._uart.read_line ()
-            if not cmd:
-                return
-            print (f'{self._tc.info}Received: {self._tc.par}{cmd}{self._tc.end}')
-            if b'sync' in cmd:
-                _data = json.loads (cmd.decode(self._encoding).replace('\n', ''))
-                self._log.info ({'msg': f'{self._txt_rtc_sync}: $p${_data}$p$'})
-                # Server has sent timestamp, convert to time tuple (year, month, mday, hour, minute, second, weekday, yearday)
-                tm = time.localtime (_data['cmd']['data']['sv_ts'])
-                tm1 = [tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0]
-                # Set RTC with time tuple (year, month, day, weekday, hours, minutes, seconds, sub-seconds)
-                _rtc.datetime (tm1)
-                self._uart.send_line ({'rsp': {'act': 'sync', 'sta': 'ok', 'data': {'cl_ts': time.time(), 'sv_ts': int (_data['cmd']['data']['sv_ts'])}}})
-                self._log.info ({'msg': f'{self._txt_rtc_sync} with $p${self._dvc_info}$p$ $a${self._txt_success} {self._txt_finish}$a$', 'acc': self._tc.success})
-                self._time_synchronised = True
-                del _data
-        except UnicodeError as ex:
-            self._log.error ({'msg': ex})
-        except (ValueError, TypeError):
-            raise
-        finally:
-            del cmd
-            gc.collect()
+            stamp = message['cmd']['data']['sv_ts']
+            if type(stamp) not in (int, float):
+                raise ValueError('invalid server timestamp')
+            tm = time.localtime(stamp)
+            machine.RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
+            reply = {'rsp': {'act': 'sync', 'sta': 'ok',
+                             'data': {'cl_ts': time.time(), 'sv_ts': int(stamp)}}}
+            if not self.send_line(reply):
+                self._log.warning({'msg': 'RTC reply could not be queued'})
+                return None
+            self._time_synchronised = True
+            self._log.info({'msg': f'RTC synchronized with {self._dvc_name}'})
+            return 0
+        except (KeyError, TypeError, ValueError, OverflowError) as ex:
+            self._log.warning({'msg': f'Invalid UART clock request: {ex}'})
+            return None
 
     # Push event to event buffer
     def __push_event (self, event: dict):

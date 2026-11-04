@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.8"
+__VERSION__ = "0.6.0.10"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, B012
 # -*- coding: utf-8 -*-
 import  gc
@@ -44,24 +44,25 @@ class UARTComms (UARTHelpersClient):
             self._ext_build = 'na' # build number of the server/external device
             self._ev_buffer = event_buffer
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
-            self._dvc_cnctd:       bool  = False # flag signalling whether the server device is connected
-            self._thread_running:  bool  = False
-            self._hs_active:       bool  = False
-            self._hs_paused:       bool  = False
-            self._sync_active:     bool  = False
-            self._dvc_cnctd:       bool  = False
-            self._cmd:             dict  = {}
-            self._cnf:             dict  = file_io.load_json (cnf_fn)
-            self._uart_buf_size:    int  = self._cnf['uart_buf_size']
-            self._encoding:         str  = self._cnf['encoding']
-            self._hs_rcv_delay:     int  = self._cnf.get('hs_rcv_delay', 0.5)
-            self._uart_interval:  float  = self._cnf.get('uart_interval', 0.01)
-            self._thread_interval: float = self._cnf.get('uart_thread_interval', 0.01)
+            self._dvc_cnctd:        bool = False
+            self._thread_running:   bool = False
+            self._hs_active:        bool = False
+            self._hs_paused:        bool = False
+            self._sync_active:      bool = False
             self._thread_paused:    bool = False
-            self._challenge:        str  = self._cnf.get('challenge_phrase', 'ping')
-            self._response:         str  = self._cnf.get('challenge_response', 'pong')
+            self._cmd:              dict = {}
+            self._cnf:              dict = file_io.load_json (cnf_fn)
+            self._uart_buf_size:     int = self._cnf['uart_buf_size']
+            self._encoding:          str = self._cnf['encoding']
+            self._hs_rcv_delay:      int = self._cnf.get('hs_rcv_delay', 0.5)
+            self._uart_interval:   float = self._cnf.get('uart_interval', 0.01)
+            self._thread_interval: float = self._cnf.get('uart_thread_interval', 0.01)
+            self._challenge:         str = self._cnf.get('challenge_phrase', 'ping')
+            self._response:          str = self._cnf.get('challenge_response', 'pong')
+            
             super().__init__(logger, self._cnf, self._tc)
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
+            
         except Exception:
             self._log.critical ({'msg': f'$p${__VERSION__}$p$ {self._txt_construct} {self._txt_failed}', 'cls': __class__})
             raise
@@ -116,6 +117,7 @@ class UARTComms (UARTHelpersClient):
             started = time.ticks_ms()
             while True:
                 try:
+                    gc.collect()
                     _thread.start_new_thread (entry, ())
                     self._dvc_cnctd = False
                     self._time_synchronised = False
@@ -143,14 +145,16 @@ class UARTComms (UARTHelpersClient):
             raise
 
     def stop ( self ) -> None:
-        self._log.debug ({'msg': '$v$Core 1 thread$v$ $a$stopping...$a$', 'acc': self._tc.waiting})
+        self.disconnect('local stop', notify=True)
+        self._log.debug ('Core 1 thread stopping...')
         with state_lock:
             shared['enabled'] = False
         stopped = self.stop_core1_graceful()
         state = '$a$stopped$a$' if stopped else '$a$NOT stopped$a$'
-        self._log.info ({'msg': f'$v$Core 1 thread$v$ {state}', 'acc': self._tc.critical})
+        self._log.info (f'Core 1 thread {state}')
 
     def pause_thread (self):
+        self.disconnect('worker paused', notify=True)
         self.__push_event ({'msg': '$v$Core 1 thread$v$ $a$pausing$a$', 'lvl': dl.INFO, 'cls': __class__, 'acc': self._tc.success})
         with state_lock:
             shared['pause'] = True
@@ -181,6 +185,7 @@ class UARTComms (UARTHelpersClient):
         return self.thread_health(timeout) in ('starting', 'running', 'stopping', 'paused')
 
     def stop_core1_graceful(self, wait=1.0):
+        self.disconnect('worker stopping')
         with state_lock:
             if shared['state'] == 'failed':
                 return False
@@ -209,6 +214,32 @@ class UARTComms (UARTHelpersClient):
             return True
 
 ########## COMMUNICATION HELPER METHODS ##########
+    def _link_changed(self):
+        self._dvc_cnctd = self._link.is_connected
+        self._hs_active = self._link.state == 'handshaking'
+        if not self._dvc_cnctd:
+            self._time_synchronised = False
+            self._dvc_name = self._dvc_ver = self._dvc_build = 'na'
+            self._uart.clear_buffers()
+        else:
+            parts = self._link.peer_name.rsplit(' ', 1)
+            self._dvc_name = parts[0]
+            self._dvc_ver = parts[1] if len(parts) == 2 else 'na'
+            self._dvc_build = self._dvc_ver.rsplit('.', 1)[-1]
+            self._wd_interval = self._link.peer_interval * self._link.multiplier
+
+    def disconnect(self, reason='local disconnect', notify=False):
+        self._link.disconnect(reason, notify)
+
+    def service_connection(self):
+        self._link.poll(self.can_send)
+        if not self.is_connected:
+            self.read_line()
+            self._link.poll(self.can_send)
+
+    def check_connection_timeout(self):
+        self._link.check_timeout()
+
     def sync_rtc (self, time_diff = 0):
         return self._sync_rtc (time_diff)
 
@@ -246,16 +277,36 @@ class UARTComms (UARTHelpersClient):
         return uart_stats
 
     def write (self, message):
-        self._uart.send_line (message)
+        return self.send_line(message)
 
     def send_line (self, message):
-        self._uart.send_line (message)
+        if not self.is_connected:
+            return False
+        if isinstance(message, dict):
+            message = {key: dict(value, tok=self._link.session) if isinstance(value, dict) else value
+                       for key, value in message.items()}
+        return self._uart.send_line(message)
 
     def read (self):
-        return self._uart.read_line ()
+        return self.read_line()
 
     def read_line (self):
-        return self._uart.read_line ()
+        for _ in range(8):
+            raw = self._uart.read_line()
+            if raw is None:
+                return None
+            try:
+                message = json.loads(raw.decode(self._encoding))
+            except (ValueError, UnicodeError):
+                self._uart._push_event({'msg': 'Invalid UART JSON payload', 'lvl': dl.WARNING})
+                continue
+            if self._link.receive(message) or not self.is_connected:
+                continue
+            if not self._link.server and message.get('cmd', {}).get('act') == 'sync':
+                self._sync_rtc(message)
+                continue
+            return raw
+        return None
 
     def clear_buffers (self):
         self._uart.clear_buffers ()
@@ -291,7 +342,10 @@ class UARTComms (UARTHelpersClient):
         return self._dvc_cnctd
 
     def connected ( self, value: bool ):
-        self._dvc_cnctd = value
+        if not value:
+            self.disconnect()
+        elif not self._link.is_connected:
+            raise ValueError('UART handshake required before connecting')
 
     @property
     def is_synchronised ( self ):
@@ -317,7 +371,8 @@ class UARTComms (UARTHelpersClient):
 
     @property
     def thread_is_paused (self) -> bool:
-        return self._thread_paused
+        with state_lock:
+            return shared['pause']
 
     @property
     def watchdog_interval (self):

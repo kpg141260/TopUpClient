@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.4"
+__VERSION__ = "0.6.0.5"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import  gc, time
@@ -35,7 +35,12 @@ class UARTthread:
     @property
     def can_send (self):
         return self._uart.can_send
-
+    def can_receive (self):
+        self._uart.can_receive()
+    def pause_thread (self):
+        self._thread_paused = True
+    def resume_thread (self):
+        self._thread_paused = False
     def __main_thread ( self) -> None:
         ########### repetitive loop to receive and transmit data ###########
         try:

@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.5"
+__VERSION__ = "0.6.0.7"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
@@ -19,7 +19,6 @@ class CommandHandlers:
         self._cmds_srvr:   list = []
         self._prefix:       str  = ''
         self.load_cmd_lists ()
-        self._v_ch = self._ver.compact(__file__)
         super().__init__()
 
     def __destruct__(self):
@@ -30,21 +29,21 @@ class CommandHandlers:
             self._cmds_system.clear()
             self._cmds_uart.clear()
             self._cmds_srvr.clear()
-            del self._cmds_tank
-            del self._cmds_main
-            del self._cmds_task
-            del self._cmds_system
-            del self._cmds_uart
-            del self._cmds_srvr
-            del self._prefix
+            self._cmds_tank = None
+            self._cmds_main = None
+            self._cmds_task = None
+            self._cmds_system = None
+            self._cmds_uart = None
+            self._cmds_srvr = None
+            self._prefix = None
             #super().__destruct__()
         finally:
             gc.collect()
 ########## CLASS PROPERTIES ##########
     def __version__ (self):
-        return self._v_ch
+        return __VERSION__
     def __repr__ (self):
-        return f'{self.__class__} Ver.: ({self._v_ch})'
+        return f'{self.__class__} Ver.: ({__VERSION__})'
     def __str__ (self):
         return f'{self.__class__}'
 
