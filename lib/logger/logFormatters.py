@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.24"
+__VERSION__ = "0.6.0.25"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import time
@@ -147,25 +147,25 @@ class LogFormatter:
 
     def __destruct__ (self):
         self._log_col.clear()
-        del self._log_col
+        self._log_col = None
         self._log_fmt.clear()
-        del self._log_fmt
+        self._log_fmt = None
         self._evt_tag_map.clear()
-        del self._evt_tag_map
+        self._evt_tag_map = None
         self._evt_fmt_lbls.clear()
-        del self._evt_fmt_lbls
+        self._evt_fmt_lbls = None
         self._log_conf.clear()
         self._orig_cfg.clear()
-        del self._orig_cfg
+        self._orig_cfg = None
         self._log_lbls.clear()
-        del self._log_lbls
-        del self._filters
-        del self._log_conf
-        del self._base_col
-        del self._accent
-        del self.rxf
-        del self._name
-        del self._txt_dm
+        self._log_lbls = None
+        self._filters = None
+        self._log_conf = None
+        self._base_col = None
+        self._accent = None
+        self.rxf = None
+        self._name = None
+        self._txt_dm = None
         gc.collect()
     def __repr__ (self):
         return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
@@ -176,7 +176,7 @@ class LogFormatter:
             Updated to minimize temporary allocations and call gc.collect() to free fragmentation. """
         if not isinstance(event_log, (dict, str)):
             raise TypeError(f'{__class__.__name__} event_log must be a \'dictionary\' or \'string\'')
-        if isinstance(event_log, str) or not any(key in event_log for key in self._evt_tag_map):
+        if isinstance(event_log, str) or not any(k in event_log for k in self._evt_tag_map):
             return event_log
 
         event = self._pre_process_event(event_log)
@@ -351,7 +351,6 @@ class LogFormatter:
             self._accent   = ''
             # Strip any tags from the event message
             event_log['msg'] = self.strip_tags (event_log.get('msg', ''))
-
         # Set label and message colors
         self._evt_tag_map['lbl'][3] = self._base_col
         self._evt_tag_map['msg'][3] = self._base_col
@@ -427,7 +426,7 @@ class LogFormatter:
 
                 # Safely extract parts from tag_info
                 # Structure: [0]=short-tag, [1]=prefix, [2]=suffix, [3]=color
-                short_tag = tag_info[0] if len(tag_info) > 0 else '' # noqa
+                short_tag = tag_info[0] if len(tag_info) > 0 else ''  # noqa: F841
                 prefix    = tag_info[1] if len(tag_info) > 1 else ''
                 suffix    = tag_info[2] if len(tag_info) > 2 else ''
                 color     = tag_info[3] if len(tag_info) > 3 else ''
@@ -517,7 +516,6 @@ class LogFormatter:
             s = s[:start] + s[end + 1:]
             start = s.find('\x1b[', start)
         return s    
-    
     @staticmethod
     def strip_tags(s, t: str = '$'):
         try:
@@ -536,13 +534,11 @@ class LogFormatter:
                     continue
             i += 1
         return s
-    
     @staticmethod
     def strip_brackets(s, f):
         for char in f:
             s = s.replace(char, '')
         return s    
-    
     @staticmethod
     def strip_spaces (s):
         cleaned = s.strip()
@@ -655,12 +651,14 @@ class regex_filters:
         if cls._cache is None:
             cls._cache = {}
         try:
+            if cls._cache is None:
+                cls._cache = {}
             """Compile and cache all predefined regex patterns."""
             for name, pattern in patterns.items():
                 if pattern and isinstance(pattern, str) and name not in cls._cache:
                     cls._cache[name] = re.compile(pattern)
         except Exception as e:
-            cls._cache = {}
+            cls._cache.clear()
             raise RuntimeError (f"Error initializing regex cache: {e}, Pattern: {name} {pattern}")
 
     @classmethod

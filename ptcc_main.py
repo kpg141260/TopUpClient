@@ -1,12 +1,10 @@
+__VERSION__ = "0.6.0.113"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 
-from lib.vt_version_object import VersionInfo
-from res.vt_version_object import VersionInfo
-
-vi = VersionInfo()
-__main_file__  = 'ptcc_main.py'
 import sys
-__path = sys.path
+_path = sys.path[:]
+
 # Add the necessary paths to the system path
 sys.path.append('/lib/logger')
 sys.path.append('/lib/common')
@@ -14,82 +12,87 @@ sys.path.append('/lib/uart')
 sys.path.append('/config')
 sys.path.append('/src')
 try:
-    import uasyncio as asyncio
-except:
-    import asyncio
-try:
-    import  machine, gc, time
-    from    ansi_esc       import text_colors as tc
-    from    logger.logger  import Logger, dbg_lvls as dl
-    from    logHandlers    import FileHandler, ConsoleHandler
-    from    logFormatters  import LogFormatter
-    from    helpers        import helpers
-    from    file_io        import FILE_IO as file_io
-    from    version        import VersionInfo as version_info
-    from    processor      import Processor
+    try:
+        import uasyncio as asyncio
+    except ImportError:
+        import asyncio
+    import gc
+    import time
+    import machine
+    from ansi_esc import text_colors as tc
+    from file_io import FILE_IO as file_io
+    from helpers import helpers
+    from logFormatters import LogFormatter
+    from logger.logger import Logger
+    from logger.logger import dbg_lvls as dl
+    from logHandlers import ConsoleHandler, FileHandler, UartHandler
+    from version import VersionInfo as version_info
+    from processor import Processor
 except Exception as ex:
+    print ('PTCC startup failed while importing dependencies:')
     sys.print_exception (ex)
-    sys.path = __path
-    del __path
-    print (f'{tc.critical}PTCS abnormal exit -> Error: {ex}{tc.end}\n')
-    machine.reset()
+    sys.path = _path
+    del _path
+    # Keep USB connected so the complete traceback can reach the REPL.
+    # Imports may have failed before machine or tc became available.
+    raise SystemExit
 
-__my_file_name         = 'ptcc_main.py'
-__version              = version_info ()
-__my_version           = __version.compact (__my_file_name)
-__file_io              = file_io (use_encryption=False, seed_file='', shift=0)
-__config: dict         = {}
-__logger: Logger       = None
-__processor: Processor = None
-__autostart: bool      = True
-__autostart_dly: int   = 1
-__config_fn            = '/config/config.json'
-__help_fncs            = helpers ()
-__EXIT_DLY: int        = 5
-__is_shutting_down     = False
-__banner: str          = f'{tc.banner}                                     Tank Topup Client - PTCC {__my_version}                                      {tc.end}'
+ME       = f'PTCC {__VERSION__}' 
+CNF_FILE = '/config/config.json'
+
+_file_io:     file_io | None = file_io (use_encryption=False, seed_file='', shift=0)
+_logger:       Logger | None = None
+_processor: Processor | None = None
+_help_fncs:   helpers | None = helpers ()
+_banner: str | None = f'{tc.banner}                                   TopUp Client - {ME}                                    {tc.end}'
+_autostart:    bool = True
+_autostart_dly: int = 1
+_EXIT_DLY:      int = 5
+_stopping:     bool = False
+
 
 def shutdown (hard_reset: bool = True, error: bool = False):
-    _fnc_name = 'shutdown'
-    global __config
-    global __logger
-    global __processor
-    global __is_shutting_down
-    global __my_version
-    global __file_io
+    global _config
+    global _logger
+    global _processor
+    global _stopping
+    global _file_io
 
-    if __is_shutting_down:
+    if _stopping:
         return
-    __is_shutting_down = True
-    if __logger and isinstance (__logger, Logger):
-            __logger.info ( {'msg': f'$a$Executing shutdown request$a$ $p$(hard_reset={hard_reset})$p$ $a$...$a$', 'src': __name__, 'fnc': _fnc_name, 'acc': tc.waiting} )
+    _stopping = True
+    if _logger and isinstance (_logger, Logger):
+            _logger.info ( {'msg': f'$a$Executing shutdown request$a$ $p$(hard_reset={hard_reset})$p$ $a$...$a$', 'src': 'ptcc', 'fnc': 'shutdown', 'acc': tc.waiting} )
     # Cleanup the processor object
-    if __processor and isinstance (__processor, Processor):
-            __processor.stop()
-            __processor.__destruct__()
-            del __processor
-    if __config and isinstance (__config, dict):
-            # Print out the memory usage
-            if bool (__config.get('show_mem_info')):
-                __logger.get_mem_info(percent = True)
-                __config.clear()
-                del __config
-    if __file_io and isinstance (__file_io, file_io):
-            __file_io.destructor()
-            del __file_io
+    if _processor and isinstance (_processor, Processor):
+            _processor.stop()
+            _processor._destruct_()
+            _processor = None
+            gc.collect()
+    if _config and isinstance (_config, dict) and bool (_config.get('showMEm_info')):
+        _logger.getMEm_info(percent = True)
+        _config.clear()
+        _config = None
+        
+    if _file_io and isinstance (_file_io, file_io):
+            _file_io.destructor()
+            _file_io = None
+            gc.collect()
     # Exit gracefully
-    if __EXIT_DLY > 0:
-        for _ in range (__EXIT_DLY, -1, -1):
+    if _EXIT_DLY > 0:
+        for _ in range (_EXIT_DLY, -1, -1):
             time.sleep (1)
-        # Cleanup the logger
-        if isinstance (__logger, Logger):
-            __logger.destructor()
-            del __logger
+    # Cleanup the logger
+    if isinstance (_logger, Logger):
+        _logger.destructor()
+        _logger = None
+        gc.collect()
     if error:
-        print (f'{tc.critical}PTCC {__my_version} terminated with error.{tc.end}\n')
+        print (f'{tc.critical}PTCC {__VERSION__} terminated with error.{tc.end}\n')
     else:
-        print (f'{tc.success}PTCC {__my_version} terminated gracefully.{tc.end}\n')
+        print (f'{tc.success}PTCC {__VERSION__} terminated gracefully.{tc.end}\n')
     gc.collect()
+    
     # Reset the microcontroller
     if not hard_reset:
         machine.soft_reset()
@@ -97,105 +100,127 @@ def shutdown (hard_reset: bool = True, error: bool = False):
         machine.reset()
     sys.exit()
 
-def init ():
-    # This is the main process
-    global __config
-    global __logger
-    global __version
-    global __processor
-    global __help_fncs
-    _fnc_name = 'init'
-    try:
-        # Init the logger
-        init_logger()
-        # Initialise the logger
-        __logger.debug ({'msg': f'$p${__my_version}$p$ $a$constructor launched...$a$', 'cls': 'main', 'acc': tc.waiting})
-        __config = __file_io.load_json (__config_fn)
-        if __config['get_time']:
-            set_time()
-        # Init the processor
-        __processor = Processor (
-            logger=__logger,
-            version=__version,
-            file_io=__file_io,
-            tc=tc,
-            config=__config,
-            cb_exit=shutdown,
-            name=f'{__config.get("self_name")} {__version.compact(__main_file__)}',
-            help_fncs=__help_fncs,
-            dbg_lvls=dl)
-        __logger.debug ({'msg': f'$c$__main__$c$ $a$constructor finished$a$', 'src': __name__, 'fnc': None, 'acc': tc.success})
-        gc.collect()
-    except:
-        raise
 
-def init_logger ():
-    global __logger
-    global __config
-    global __file_fn
-    global __file_io
+def init ():
+    global _logger
+    global _config
+    
+    # Initialize the config objecct
+    _config = _file_io.load_json (CNF_FILE)
+    # Init the logger
+    _logger = init_logger(_config)
+    
+    if _config['get_time']:
+        set_time()
+        
+    # Init the processor
+    processor = Processor (
+        logger=_logger,
+        file_io=_file_io,
+        tc=tc,
+        config=_config,
+        cb_exit=shutdown,
+        name=f'{_config.get("self_name")} {__VERSION__}',
+        help_fncs=_help_fncs,
+        dbg_lvls=dl)
+
+    gc.collect()
+    return processor
+
+
+def init_logger (config) -> Logger:
 
     try:
         # Load the logger configuration file
-        __config     = __file_io.load_json (__config_fn)
-        __log_config = __file_io.load_json (__config['files']['log_config'])
-        if isinstance (__config, dict) and __config is not {}:
-            __logger = Logger (config_fn = __config['files']['log_config'],
-                                level = __log_config['debug_levels']['logger'],
-                                name='ptcc'
-                                )
-            ch = ConsoleHandler (writer=__logger.aWriter(),
-                                ts_format=__logger.log_fmt['ts_format'],
-                                name='',
-                                level = __log_config['debug_levels']['console_handler']
-                                )
-            __logger.addHandler (ch)
-            fh = FileHandler    (filename=__config['files']['log_file'],
-                                truncate=__logger.log_conf['truncate'],
-                                name='',
-                                level = __log_config['debug_levels']['file_handler']
-                                )
-            __logger.addHandler (fh)
-            lfc  = LogFormatter (log_colors=Logger.log_colors,
-                                log_fmt=__logger.log_fmt,
-                                name='LFC')
-            ch.addFormatter     (lfc.format_output)
-            lfnc = LogFormatter (log_colors=None,
-                                log_fmt=__logger.log_fmt,
-                                name='LFNC')
-            fh.addFormatter     (lfnc.format_output)      # Formats the output string according to the configuration
-            del __log_config
+        log_config = _file_io.load_json (_config['files']['log_config'])
+        
+        if isinstance (_config, dict) and _config != {}:
+            logger = Logger(
+                log_cnf_fn = _config['files']['log_config'],
+                level = log_config['tgt_dbg_lvls']['logger'],
+                name='ptcc'
+            )
+            
+            lfnc: LogFormatter | None = None
+            lfc: LogFormatter  | None = None
+            enable = log_config['settings']['enable']
+            
+            # Construct the log formatters based on the configuration
+            if enable.get('console', False) or enable.get('file', False):
+                lfnc = LogFormatter(
+                    log_fmt = logger.log_config,
+                    name    = 'lfnc'
+                )
+            lfc = LogFormatter(
+                log_fmt = logger.log_config,
+                name    = 'lfc'
+            )
+            
+            if enable.get('console', False):
+                ch = ConsoleHandler(
+                    writer=logger.aWriter(),
+                    ts_format=logger.log_config['logFormat']['ts_format'],
+                    name='ptcc',
+                    level = log_config['tgt_dbg_lvls']['console_handler']
+                )
+                logger.addHandler(ch)
+                ch.addFormatter(lfc.format_output)
+
+            if enable.get('file', False):
+                fh = FileHandler(
+                    filename=_config['files']['log_file'],
+                    truncate=logger.log_conf['settings']['truncate'],
+                    name='ptcc',
+                    level = log_config['tgt_dbg_lvls']['file_handler']
+                )
+                logger.addHandler(fh)
+                fh.addFormatter(lfnc.format_output)
+                
+            if enable.get('uart', False):
+                uh = UartHandler(
+                    uart = None,
+                    name='ptcc',
+                    level = log_config['tgt_dbg_lvls']['uart_handler']
+                )
+                logger.addHandler(uh)
+                uh.addFormatter(lfc.format_output)
+                
+            return logger
     except Exception as ex:
-        print (f'{tc.critical}[critical] [{__name__} {_fnc_name}] {str (ex)}{tc.end}')
+        print (f'{tc.critical}[critical] {ME} {ex!s}{tc.end}')
         sys.print_exception (ex)
-        shutdown (hard_reset=True, error=True)
+        raise
+    finally:
+        if log_config:
+            log_config = None
+        gc.collect()
+
 
 def set_time ():
-    global __config
-    global __logger
-    __rtc = machine.RTC()
+    _rtc = machine.RTC()
     t = input (f'{tc.info}Enter date and time in the format {tc.par}yyyy:mm:dd:wd:hh:mm:ss -> {tc.success}')
     time = t.split(':')
     if len (time) == 7:
-        __rtc.datetime ((int (time[0]), int (time[1]), int (time[2]), int (time[3]), int (time[4]), int (time[5]), int (time[6]), 0))
-        __logger.info ({'msg': f'RTC set to: $a${__rtc.datetime()}$a$', 'acc': tc.success})
+        _rtc.datetime ((int (time[0]), int (time[1]), int (time[2]), int (time[3]), int (time[4]), int (time[5]), int (time[6]), 0))
+        _logger.info ({'msg': f'RTC set to: $a${_rtc.datetime()}$a$', 'acc': tc.success})
     else:
-        __logger.warning ({'msg': f'Invalid time entered: $a${input}$a$', 'acc': tc.error})
+        _logger.warning ({'msg': f'Invalid time entered: $a${input}$a$', 'acc': tc.error})
+
 
 ###############################################################################
 #                       Main part starts here                                 #
 ###############################################################################
-#if __name__ == 'main':
+#if _name_ == 'main':
 """
     Entry point for the script. Runs the main loop using asyncio.
 """
 # Make sure memory has been cleared before starting
 gc.collect ()
 # Print out the product name and version
-print (__banner)
-del __banner
-_fnc_name = 'main'
-if not __autostart:
+print (_banner)
+_banner = None
+
+if not _autostart:
     key = input("Enter 's' to start, 'q' to quit...")
     if key == 'q':
         gc.collect()
@@ -203,20 +228,21 @@ if not __autostart:
         sys.exit()
 else:
     # If autostart then wait for autostart_delay until execution starts
-    time.sleep(__autostart_dly)
+    time.sleep(_autostart_dly)
+
 try:
     # Initialise main objects
-    init()
-    __version.destructor ()
+    _processor = init()
     # Start the Processor
-    if isinstance (__processor, Processor):
-        __processor.start ()
+    if isinstance (_processor, Processor):
+        _processor.start ()
 
 except KeyboardInterrupt:
-    print(f'{tc.orange}[warning] [{__name__}{_fnc_name}] Program Interrupted by Ctrl+C{tc.end}')
+    print(f'{tc.orange}[warning] {ME} Program Interrupted by Ctrl+C{tc.end}')
     shutdown (hard_reset=True)
 
 except Exception as ex:
-    print (f'{tc.bred}[critical] [{__name__}.{_fnc_name}] {type (ex)} -> {str (ex)}{tc.end}')
+    print (f'{tc.bred}[critical] {ME} {type (ex)} -> {ex!s}{tc.end}')
     sys.print_exception (ex)
-    shutdown (hard_reset=True)
+    # Leave the failed startup available for inspection instead of resetting USB.
+    raise SystemExit

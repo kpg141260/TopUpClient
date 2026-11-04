@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.5"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.10"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, UP041, BLE001
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
@@ -17,8 +17,9 @@ from   machine import PWM, Pin
 # which can be activated in async_tasks.json
 class AsyncHandlers:
     def __init__(self):
-        self._v_ah = self._ver.compact(__file__)
+        self.__bind_async_fncs ()
         super().__init__()
+
 ########## ASYNCHRONOUS TASK DEFINITIONS ##########
     # ASYNC Function to check the tank
     async def as_tank_check (self, name: str, task_info: dict):
@@ -101,8 +102,8 @@ class AsyncHandlers:
         gc.collect()
         try:
             while True:
-                if self.task_register[name]['state'] != self.as_state.PAUSED and gc.mem_free () < self._mem_threshold:
-                        gc.collect()
+                if self.task_register[name]['state'] != self.as_state.PAUSED:
+                    gc.collect()
                 await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
@@ -169,22 +170,33 @@ class AsyncHandlers:
                     req = self._uart.read_line()
                     if req:
                         self._log.debug({'msg': f'UART received: {req.decode(self._encoding).strip()}'})
-                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                        self._uart_watchdog_event.set ()
+                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling(name=name, task_info=task_info)
             raise
     # ASYNC uart watchdog - checks whether client is connected
-    async def as_uart_watchdog(self, name: str, task_info: dict):
-        self.__log_task_started(name=name, task_info=task_info)
-        try:
-            while True:
-                if (self.task_register[name]['state'] != self.as_state.PAUSED
-                        and not self._uart.thread_is_paused):
-                    self._uart.check_connection_timeout()
-                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
-        except asyncio.CancelledError:
-            self.__log_task_cancelling(name=name, task_info=task_info)
-            raise
+    async def as_uart_watchdog (self, name: str, task_info: dict):
+        self.__log_task_started (name=name, task_info=task_info)
+        gc.collect()
+        while True:
+            try:
+                if self.task_register[name]['state'] != self.as_state.PAUSED:
+                    # wait for event with timeout
+                    await asyncio.wait_for (self._uart_watchdog_event.wait(), timeout=self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                    # Event received in time, reset and keep waiting
+                    self._uart_watchdog_event.set()          
+            except asyncio.TimeoutError:
+                self._log.warning ({'msg': 'Watchdog timeout! $a$Trying to recover...$a$', 'src': __name__, 'acc': self._tc.waiting})
+                if self.task_register['as_uart_cmd']['state'] == self.as_state.RUNNING: self.task_manager.cancel_task (task_name='as_uart_cmd')
+                if self.task_register['as_rtc_sync']['state'] == self.as_state.RUNNING: self.task_manager.cancel_task (task_name='as_rtc_sync')
+                self.task_manager.cancel_task (task_name='as_uart_connect')
+                self.task_manager.cancel_task (task_name='as_uart_watchdog')
+            except asyncio.CancelledError:
+                self.__log_task_cancelling (name=name, task_info=task_info)
+                raise
+            except Exception:
+                raise
     # ASYNC get event log data from coms object
     async def as_uart_event (self, name: str, task_info: dict):
         self.__log_task_started (name=name, task_info=task_info)
@@ -289,8 +301,9 @@ class AsyncHandlers:
                 self._log.trace ({'exc': ex, 'cls': __class__})
                 raise
     # Async function to check thread status
-    async def as_thread_monitor(self, name: str, task_info: dict):
-        self.__log_task_started(name=name, task_info=task_info)
+    async def as_thread_monitor (self, name: str, task_info: dict):
+        self.__log_task_started (name=name, task_info=task_info)
+        gc.collect()
         try:
             while True:
                 if (self.task_register[name]['state'] != self.as_state.PAUSED
@@ -316,15 +329,15 @@ class AsyncHandlers:
 ########## HELPER METHODS ##########
     def __log_task_started (self, name: str, task_info: dict):
         if task_info['id'] == 0:
-            try:
-                task_info['id'] = self.task_register.get(name, {}).get('task_id', 0)
-            except:
-                pass
+            task_info['id'] = self.task_register.get(name, {}).get('task_id', 0)
+            
         self._log.info ({'msg': f'$f${name}$f$ $i${task_info['id']}$i$ $a$has started$a$. Interval = $p${task_info['intv']} sec$p$', 'acc': self._tc.success})
     def __log_task_cancelling (self, name: str, task_info: dict):
         self._log.debug ({'msg': f'$f${name}$f$ $i${task_info['id']}$i$$a$ cancelled$a$', 'acc': self._tc.warning})
+        
     def __log_task_paused (self, name: str, task_info: dict):
         self._log.info ({'msg': f'$f${name}$f$ $i${task_info['id']}$i$$a$ {self.as_state.PAUSED}$a$', 'acc': self._tc.waiting})
+        
     def __bind_async_fncs (self):
         for task_name, task_info in self.task_register.items():
             cls_name = task_info.get ('cls', None)
@@ -342,7 +355,6 @@ class AsyncHandlers:
                     self._log.warning ({'msg': f'Function $p${task_name}$p$ in class $p${cls_name}$p$ is not callable', 'src': __name__})
             except AttributeError:
                 self._log.warning ({'msg': f'Function $p${task_name}$p$ not found in class $p${cls_name}$p$', 'src': __name__})
-
 ########## ASYNCHRONOUS TEST METHODS ##########
     # ASYNC task to create error task
     async def as_error (self, name: str, task_info: dict):

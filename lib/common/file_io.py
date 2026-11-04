@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.10"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.11"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, E722, BLE001, S110
 # -*- coding: utf-8 -*-
 try:
     import ujson as json 
@@ -29,15 +29,15 @@ class FILE_IO:
                 self._crypto = None
         
     def destructor (self):
-        del self.txt_dne
-        del self.txt_ioe
-        del self.txt_pde
-        del self.txt_rde
-        del self.txt_wte
-        del self.txt_type
+        self.txt_dne = None
+        self.txt_ioe = None
+        self.txt_pde = None
+        self.txt_rde = None
+        self.txt_wte = None
+        self.txt_type = None
         if self._crypto:
             self._crypto.destructor()
-            del self._crypto
+            self._crypto = None
     
     def load_json (self, fn: str):
         return self._load_file (fn, file_type='json')
@@ -67,7 +67,7 @@ class FILE_IO:
             elif ex.args[0] == 13:
                 raise OSError (self.txt_pde.format (__name__, fn))
             raise
-        except Exception as ex:
+        except Exception:
             raise OSError (self.txt_rde.format (__name__, fn))
     
     def write (self, fn: str, data: str):
@@ -100,7 +100,9 @@ class FILE_IO:
             elif ex.args[0] == 13:
                 raise OSError (self.txt_pde.format (__name__, fn))
             raise
-        except TypeError as ex:
+
+        except TypeError:
             raise TypeError (self.txt_type.format (__name__, fn))
-        except Exception as ex:
+
+        except Exception:
             raise OSError (self.txt_wte.format (__name__, fn))

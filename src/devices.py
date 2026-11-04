@@ -1,4 +1,5 @@
-__VERSION__ = "0.5.0.1"
+__VERSION__ = "0.6.0.6"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import onewire, ds18x20, time        # type: ignore
 from   machine     import Pin, Timer # type: ignore
@@ -28,9 +29,7 @@ class Relay:
         ON = True
         OFF = False
 
-    def __init__(self, config: dict, logger, name: str, tc, ver, enabled) -> None:
-        global block_active
-        self._my_ver = ver.compact(__file__)
+    def __init__(self, config: dict, logger, name: str, tc, enabled) -> None:
         self._name = name
         self._log = logger
         self._tc = tc
@@ -74,8 +73,7 @@ class Relay:
     def on(self, enable_timer: bool = False, force: bool = False) -> bool:
         global block_active
         self.is_enabled()
-        if force or not self._relay_status:
-            if not block_active or force:
+        if force or not self._relay_status and not block_active:
                 if enable_timer and not force:
                     self._timer.init(period=self._block_time, mode=Timer.ONE_SHOT, callback=isr_block)
                     block_active = True
@@ -127,7 +125,7 @@ class Relay:
         self._enabled = value
         
 class TempSensor:
-    def __init__(self, config: dict, logger, tc, ver, enabled: bool, name='DS18X20'):
+    def __init__(self, config: dict, logger, tc, enabled: bool, name='DS18X20'):
         self._tc = tc
         self._enabled = enabled
         self._name = name
@@ -146,7 +144,7 @@ class TempSensor:
             self.is_enabled()
             self._sensors = self._ds_sensor.scan()
         except NotImplementedError as ex:
-            self._log.warning ({'msg': f'{str (ex)}'})
+            self._log.warning ({'msg': f'{ex!s}'})
             return
         except Exception:
             raise
@@ -174,70 +172,60 @@ class TempSensor:
         if self._ds_sensor:
             del self._ds_sensor
         if self._sensors:
-            del self._sensors
-        del self._temps
-        del self._ds_pin
-        del self._tc
-        del self._name
-        del self._kelvin
-        del self._unit
-        del self._idx
-        del self._min_len
-        del self._max_len
-        del self._fc_period
-        del self._ms
+            self._sensors = None
+        self._temps = None
+        self._ds_pin = None
+        self._tc = None
+        self._name = None
+        self._kelvin = None
+        self._unit = None
+        self._idx = None
+        self._min_len = None
+        self._max_len = None
+        self._fc_period = None
+        self._ms = None
 
     def __read(self) -> float:
-        try:
-            self.is_enabled()
-            self._ds_sensor.convert_temp()
-            time.sleep_ms(self._ms)
-            return self._ds_sensor.read_temp(self._sensors[self._idx])
-        except Exception as ex:
-            raise ex
+        self.is_enabled()
+        self._ds_sensor.convert_temp()
+        time.sleep_ms(self._ms)
+        return self._ds_sensor.read_temp(self._sensors[self._idx])
 
     def read_temp(self) -> float:
-        try:
-            now = time.time() / 60
-            t = self.__read()
-            if self._unit == 'F':
-                t = t * (9 / 5) + 32
-            elif self._unit == 'K':
-                t = t + self._kelvin
-            if len(self._temps) > self._max_len:
-                self._temps.pop()
-            self._temps.append((now, t))
-            return round(t, 2)
-        except Exception as ex:
-            raise ex
+        now = time.time() / 60
+        t = self.__read()
+        if self._unit == 'F':
+            t = t * (9 / 5) + 32
+        elif self._unit == 'K':
+            t = t + self._kelvin
+        if len(self._temps) > self._max_len:
+            self._temps.pop()
+        self._temps.append((now, t))
+        return round(t, 2)
 
     def select_device(self, index: int = 0):
-        if self._cnt > 1:
-            if index >= self._cnt or index < 0:
+        if self._cnt > 1 and (index >= self._cnt or index < 0):
                 raise IndexError(f'Index for DS18X20 {index} is out of bounds. Select 0 to {self._cnt - 1}')
         self._idx = index
 
     def get_trend(self):
-        try:
-            temp = self.read_temp()
-            n = len(self._temps)
-            if n < self._min_len:
-                return [temp, 0.0, 0.0, 0.0, n, 0.0, self._fc_period]
-            x = [t[0] for t in self._temps]
-            y = [t[1] for t in self._temps]
-            x_mean = sum(x) / n
-            y_mean = sum(y) / n
-            numerator = sum((x[i] - x_mean) * (y[i] - y_mean) for i in range(n))
-            denominator = sum((x[i] - x_mean) ** 2 for i in range(n))
-            if denominator == 0:
-                return [temp, 0.0, 0.0, 0.0, n, 0.0, self._fc_period]
-            slope = round(numerator / denominator, 2)
-            elapsed = round(x[-1] - x[0], 2)
-            trend = round(y[-1] - y[0], 2)
-            projected_temp = round(temp + slope * self._fc_period, 2)
-            return [temp, slope, trend, elapsed, n, projected_temp, self._fc_period]
-        except Exception as ex:
-            raise ex
+        temp = self.read_temp()
+        n = len(self._temps)
+        if n < self._min_len:
+            return [temp, 0.0, 0.0, 0.0, n, 0.0, self._fc_period]
+        x = [t[0] for t in self._temps]
+        y = [t[1] for t in self._temps]
+        x_mean = sum(x) / n
+        y_mean = sum(y) / n
+        numerator = sum((x[i] - x_mean) * (y[i] - y_mean) for i in range(n))
+        denominator = sum((x[i] - x_mean) ** 2 for i in range(n))
+        if denominator == 0:
+            return [temp, 0.0, 0.0, 0.0, n, 0.0, self._fc_period]
+        slope = round(numerator / denominator, 2)
+        elapsed = round(x[-1] - x[0], 2)
+        trend = round(y[-1] - y[0], 2)
+        projected_temp = round(temp + slope * self._fc_period, 2)
+        return [temp, slope, trend, elapsed, n, projected_temp, self._fc_period]
 
     def temp_unit(self, unit: str):
         unit = unit.upper()
@@ -278,12 +266,12 @@ class LiquidSensor:
         self._enabled       = enable
         
     def __del__ (self):
-        del self._name
-        del self.active_state
-        del self.pin
-        del self._txt_not_avail
-        del self._txt_sensor
-        del self._txt_type
+        self._name = None
+        self.active_state = None
+        self.pin = None
+        self._txt_not_avail = None
+        self._txt_sensor = None
+        self._txt_type = None
 
     def is_enabled (self):
         if not self._enabled:

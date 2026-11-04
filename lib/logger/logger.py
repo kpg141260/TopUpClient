@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.6"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.7"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012
 # -*- coding: utf-8 -*-
 import  gc
 import  time
@@ -46,10 +46,10 @@ class dbg_lvls:
     CRITICAL:   DbgLevel
     TRACE:      DbgLevel
     PRINT:      DbgLevel
-
-    _levels: ClassVar[dict[str, DbgLevel]] = {}
-    _name_to_obj: ClassVar[dict[str, DbgLevel]] = {}
-    _value_to_obj: ClassVar[dict[int, DbgLevel]] = {}
+    
+    _levels:        dict = {}
+    _name_to_obj:   dict = {}
+    _value_to_obj:  dict = {}
 
     def __new__ (cls, value):
         """Allow dbg_lvls('DEBUG') style."""
@@ -117,36 +117,32 @@ class Logger:
             self.info ({'msg': f'\u001b[1;38;5;154mLogger initialised.\u001b[38;5;46m Debug level: \u001b[38;5;33m{Logger.level}={int(Logger.level)}\u001b[38;5;46m Memory used: \u001b[38;5;33m{_mem - gc.mem_free()} bytes\u001b[0m', 'eid': 0})
         finally:
             gc.collect()
-
     def destructor (self):
         try:
             self.debug ({'msg': '__destruct__ launched...', 'cls': __class__, 'src': None, 'fnc': None, 'acc': '\u001b[1;38;5;105m' })
             for handler in self._handlers:
                 if hasattr (handler, '__destruct__'):
                     handler.__destruct__()
-            del self._handlers
+            self._handlers = None
             if Logger.log_config is not None:
                 Logger.log_config.clear()
-                del Logger.log_config
-            del self._def_handler
-            del self._writer
-            del self._reader
-            del self._lock_writer
-            del self._lock_reader
-            del self._lock_logger
+                Logger.log_config = None
+            self._def_handler = None
+            self._writer = None
+            self._reader = None
+            self._lock_writer = None
+            self._lock_reader = None
+            self._lock_logger = None
         finally:
             print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129m__destruct__ finished...\u001b[0m')
             gc.collect()
 
     def __repr__ (self):
         return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
-
     def __str__ (self):
         return f'{self.__class__.__name__}'
 
     def __load_and_check_log_config_file (self, log_cnf_fn: str):
-        print (f"Loading file {log_cnf_fn}")
-
         with open (log_cnf_fn, 'r') as f:
             Logger.log_config = json.load (f)
         if 'settings' not in Logger.log_config:
@@ -163,7 +159,6 @@ class Logger:
             raise KeyError (f'Logger config file {log_cnf_fn} missing \'evt_tag_map\' section!')
         if 'filters' not in Logger.log_config:
             raise KeyError (f'Logger config file {log_cnf_fn} missing \'filters\' section!')
-
 ###############################################################################
 # LOGGER MAIN METHODS
 ###############################################################################

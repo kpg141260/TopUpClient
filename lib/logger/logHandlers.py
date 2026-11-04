@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.18"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
+__VERSION__ = "0.6.0.20"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import gc
 import os
@@ -7,7 +7,7 @@ import time
 import ujson as json
 from   logger.logger import dbg_lvls
 from   collections   import deque
-from   machine       import UART
+from   uart.uart     import UARTComms
 try:
     import usocket as socket
 except ImportError:
@@ -41,7 +41,6 @@ class FileHandler:
     def __init__ (self, filename: str,truncate: bool=True, max_log_size: int=20000, ts_format: str='%Y-%m-%d %H:%M:%S', name='', level='off'):
         global __fileOperations
         self._name           = name
-        self._my_ver         = '2025.05.29.172438.12'
         self._log_fn         = filename
         self._formatters     = deque ([], MAX_Q)
         self._filters        = deque ([], MAX_Q)
@@ -63,19 +62,22 @@ class FileHandler:
         for filter in self._filters:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
-        del self._formatters
-        del self._filters
-        del self._name
-        del self._level
-        del self._log_fn
-        del self._file_ops
+        self._formatters = None
+        self._filters = None
+        self._name = None
+        self._level = None
+        self._log_fn = None
+        self._file_ops = None
         # __fileOperations object counts the number of instantiations and only destroys itself if count is 0
         # This is to avoid memory leaks
-        __fileOperations.destructor ()
+        if self._ops_ref_cnt > 0:
+            self._ops_ref_cnt -= 1
+        else:
+            __fileOperations.destructor ()
         gc.collect()
 
     def __repr__ (self):
-        return f'{self.__class__.__name__} Ver.: ({self._my_ver})'
+        return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
 
     def __str__ (self):
         return f'{self.__class__.__name__}'
@@ -151,10 +153,10 @@ class FileOperations:
             self._ops_ref_cnt -= 1
             return
 
-        del self._max_log_size
-        del self._min_disc_space
-        del self._truncate
-        del self._ts_format
+        self._max_log_size = None
+        self._min_disc_space = None
+        self._truncate = None
+        self._ts_format = None
         gc.collect()
 
     def write (self, event_str, log_fn):
@@ -267,12 +269,12 @@ class FileOperations:
 # LOGGER UART HANDLER
 ###############################################################################
 class UartHandler:
-    def __init__ (self, uart, ts_format: str='%Y-%m-%d %H:%M:%S.%f', name='', level='off'):
+    def __init__ (self, uart: UARTComms | None = None, ts_format: str='%Y-%m-%d %H:%M:%S.%f', name='', level='off'):
         print (f'{'UartHandler'}.__init__ ({ts_format}, {name}, {level}, {dbg_lvls(level)})')
         self._uart       = uart
         self._ts_format  = ts_format
-        self._formatters = deque ([])
-        self._filters    = deque ([])
+        self._formatters = deque ([], MAX_Q)
+        self._filters    = deque ([], MAX_Q)
         self._name       = name
         self._level      = dbg_lvls(level)
         print (f'UART Handler initialized. Debug level: {self._level}')
@@ -284,12 +286,15 @@ class UartHandler:
         for filter in self._filters:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
-        del self._formatters
-        del self._filters
-        del self._name
+        self._formatters = None
+        self._filters = None
+        self._name = None
         gc.collect()
 
     def write (self, event_log):
+        if self._uart is None:
+            return
+        
         if self._level <= dbg_lvls.OFF:
             return
         if len (self._formatters) == 0:
@@ -303,7 +308,7 @@ class UartHandler:
         #            simply forward the raw event to the server
         # The comms uart class provides a buffer of 10 messages. If the buffer is full, the oldest entry will be dropped.
         event = {'log': event_log}
-        if isinstance (self._uart, UART):
+        if isinstance (self._uart, UARTComms):
             self._uart.write (json.dumps (event, separators=(',', ':')).encode('utf-8'))
         else:
             if self._uart.is_connected:
@@ -325,6 +330,11 @@ class UartHandler:
     def removeFilter (self, filter):
         if filter in self._filters:
             self._filters.remove (filter)
+            
+    def set_uart (self, uart: UARTComms):
+        if not isinstance (uart, UARTComms):
+            raise TypeError (f'Expected UARTComms instance, got {type(uart).__name__}')
+        self._uart = uart
 
     @property
     def name (self):
@@ -357,17 +367,16 @@ class ConsoleHandler:
         for filter in self._filters:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
-        del self._formatters
-        del self._filters
-        del self._name
+        self._formatters = None
+        self._filters = None
+        self._name = None
         gc.collect()
 
     def write (self, event_log):
-        if isinstance(event_log, dict):
-            event_log.pop('tgt', None)  # Remove handler name to avoid recursion
         if self._level <= dbg_lvls.OFF:
             return
         if isinstance (event_log, dict):
+            event_log.pop('tgt')  # Remove handler name to avoid recursion
             event_str: str = ''
             if self._level <= event_log['lvl']:
                 event_str: str = ''
@@ -413,7 +422,7 @@ class ConsoleHandler:
 
     def flush(self):
         """Dummy flush method to support sys.stdout redirection."""
-        pass  # ✅ No-op to prevent errors  # noqa: PIE790
+        return  # ✅ No-op to prevent errors
 
 ###############################################################################
 # LOGGER SOCKET HANDLER
@@ -422,10 +431,11 @@ class SocketHandler:
     def __init__ (self, host: str, port: int, name='', level='off', timeout=2):
         if socket is None:
             raise ImportError('SocketHandler requires firmware with socket support')
-        if not 1 <= port <= 65535:
-            raise ValueError('SocketHandler port must be between 1 and 65535')
-        if timeout <= 0:
-            raise ValueError('SocketHandler timeout must be positive and non-zero')
+        else:
+            if not 1 <= port <= 65535:
+                raise ValueError('SocketHandler port must be between 1 and 65535')
+            if timeout <= 0:
+                raise ValueError('SocketHandler timeout must be positive and non-zero')
         self._host       = host
         self._port       = int(port)
         self._name       = name
@@ -445,18 +455,26 @@ class SocketHandler:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
         self._formatters = None
-        self._filters    = None
-        self._sock       = None
+        self._filters = None
         gc.collect()
 
     def close (self):
-        sock = self._sock
+        if self._sock:
+            try:
+                self._sock.close()
+            except OSError as ex:
+                print(f'[warning] SocketHandler {self._host}:{self._port} close failed: {ex}')
         self._sock = None
         if sock:
             try:
                 sock.close()
             except OSError as ex:
                 print(f'[warning] SocketHandler {self._host}:{self._port} close failed: {ex}')
+
+    def _connection_failed (self, error):
+        self._retry_started = time.ticks_ms()
+        self.close()
+        print(f'[warning] SocketHandler {self._host}:{self._port} log delivery failed: {error}')
 
     def _connection_failed (self, error):
         self._retry_started = time.ticks_ms()

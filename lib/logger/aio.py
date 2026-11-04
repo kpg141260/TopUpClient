@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.5"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.6"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import sys
 import select
@@ -24,7 +24,6 @@ class stdoutHandler:
         except OSError as ex:
             if 'TinyUSB' in str(ex):
                 sys.stdout.write ('\n')
-                pass
         except Exception as ex:
             if DEV_MODE:
                 try:

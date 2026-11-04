@@ -1,4 +1,4 @@
-__VERSION__ = "0.5.0.3"
+__VERSION__ = "0.6.0.6"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 import os
 import time
@@ -48,7 +48,10 @@ class UARTLink:
         self._handshake_sent = False
         self._deadline = time.ticks_add(time.ticks_ms(), self.timeout_ms)
         self._changed()
-        self._event({'msg': 'UART handshake attempt 1/%d' % self.max_attempts, 'lvl': 10})
+        if self.max_attempts != 0:
+            self._event({'msg': f'UART handshake attempt 1/{self.max_attempts}', 'lvl': 10})
+        else:
+            self._event({'msg': 'UART handshake attempt 1', 'lvl': 10})
 
     def _retire_session(self):
         if self.session is not None and self.session not in self._retired:
@@ -62,7 +65,7 @@ class UARTLink:
         self.state = 'connected'
         self._last_rx = self._last_tx = time.ticks_ms()
         self._changed()
-        self._event({'msg': 'UART connected: %s' % self.peer_name, 'lvl': 20})
+        self._event({'msg': f'UART connected: {self.peer_name}', 'lvl': 20})
 
     def disconnect(self, reason, notify=False):
         if self.state == 'disconnected':
@@ -78,14 +81,13 @@ class UARTLink:
         self._changed()
         if notify and token is not None:
             self._send({'cmd': {'act': 'exit', 'tok': token}})
-        self._event({'msg': 'UART disconnected: %s' % reason, 'lvl': 30})
+        self._event({'msg': f'UART disconnected: {reason}', 'lvl': 30})
 
     def poll(self, ready):
         now = time.ticks_ms()
         if self.is_connected:
-            if ready and time.ticks_diff(now, self._last_tx) >= self.interval * 1000:
-                if self._send({'cmd': {'act': 'hb', 'tok': self.session}}):
-                    self._last_tx = now
+            if ready and time.ticks_diff(now, self._last_tx) >= self.interval * 1000 and self._send({'cmd': {'act': 'hb', 'tok': self.session}}):
+                self._last_tx = now
             return
         if self.state == 'disconnected':
             if not self.server or time.ticks_diff(now, self._next_attempt) < 0:
@@ -96,7 +98,10 @@ class UARTLink:
                 self.disconnect('handshake retry limit reached')
                 return
             self.attempts += 1
-            self._event({'msg': 'UART handshake attempt %d/%d' % (self.attempts, self.max_attempts), 'lvl': 10})
+            if self.max_attempts != 0:
+                self._event({'msg': f'UART handshake attempt {self.attempts}/{self.max_attempts}', 'lvl': 10})
+            else:
+                self._event({'msg': f'UART handshake attempt {self.attempts}', 'lvl': 10})
             self._sent = False
             self._deadline = time.ticks_add(now, self.timeout_ms)
         if not ready:

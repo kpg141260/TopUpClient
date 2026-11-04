@@ -1,16 +1,13 @@
-__VERSION__ = "0.5.0.6"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.7"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, E722
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
 except:
     import asyncio
-try:
-    import time, json, gc, sys, machine
-    from uart_thread import UARTthread
-    from uart_link import UARTLink
-except Exception as ex:
-    raise
+import time, json, gc, sys, machine
+from uart_thread import UARTthread
+from uart_link import UARTLink
 
 class UARTHelpersClient (UARTthread):
     ################# INITIALIZATION AND DESTRUCTION #################
@@ -22,7 +19,7 @@ class UARTHelpersClient (UARTthread):
             super().__init__(logger, cnf, tc)
             self._uart._push_event = self.__push_event
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
-        except (Exception) as ex:
+        except (Exception):
             self._log.critical ({'msg': f'$p${__VERSION__}$p$ {self._txt_construct} {self._txt_failed}', 'cls': __class__})
             raise
         finally:
@@ -32,8 +29,6 @@ class UARTHelpersClient (UARTthread):
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             super().__destruct__()
-        except (Exception) as ex:
-            raise
         finally:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
             gc.collect()
@@ -55,10 +50,10 @@ class UARTHelpersClient (UARTthread):
                 self._log.warning({'msg': 'RTC reply could not be queued'})
                 return None
             self._time_synchronised = True
-            self._log.info({'msg': 'RTC synchronized with %s' % self._dvc_name})
+            self._log.info({'msg': f'RTC synchronized with {self._dvc_name}'})
             return 0
         except (KeyError, TypeError, ValueError, OverflowError) as ex:
-            self._log.warning({'msg': 'Invalid UART clock request: %s' % ex})
+            self._log.warning({'msg': f'Invalid UART clock request: {ex}'})
             return None
 
     # Push event to event buffer

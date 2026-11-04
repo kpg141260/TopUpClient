@@ -1,0 +1,50 @@
+# Environment File
+.env
+
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE/editor settings
+.vscode/
+.zed/
+
+# Backups
+.backups/
+*.backup
+*copy.*
+
+# Generated version information
+version_manifest.json
+vt_*.json
+
+# Logs
+log/
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+
+# Packaging/build output
+build/
+dist/
+*.egg-info/
+
+# Desktop/filesystem metadata
+.directory
+.stfolder
+.DS_Store
+*.sync-conflict*
+.vscode
+.micropico
+
+# Coding Agents
+AGENTS.md
+.stignore

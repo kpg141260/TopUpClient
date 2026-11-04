@@ -1,31 +1,26 @@
-__VERSION__ = "0.5.0.2"
+__VERSION__ = "0.6.0.7"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
-except:
+except ImportError:
     import asyncio
-try:
-    import gc
-except ImportError as ex:
-    raise
+
+import gc
 
 class CommandHandlers:
 ########## CLASS INIT AND DESTRUCTOR ##########
     def __init__(self):
-        try:
-            self._cmds_main:   list = []
-            self._cmds_task:   list = []
-            self._cmds_tank:   list = []
-            self._cmds_system: list = []
-            self._cmds_uart:   list = []
-            self._cmds_srvr:   list = []
-            self._prefix:       str  = ''
-            self.load_cmd_lists ()
-            self._v_ch = self._ver.compact(__file__)
-            super().__init__()
-        except Exception as ex:
-            raise ex
+        self._cmds_main:   list = []
+        self._cmds_task:   list = []
+        self._cmds_tank:   list = []
+        self._cmds_system: list = []
+        self._cmds_uart:   list = []
+        self._cmds_srvr:   list = []
+        self._prefix:       str  = ''
+        self.load_cmd_lists ()
+        super().__init__()
+
     def __destruct__(self):
         try:
             self._cmds_main.clear()
@@ -34,23 +29,21 @@ class CommandHandlers:
             self._cmds_system.clear()
             self._cmds_uart.clear()
             self._cmds_srvr.clear()
-            del self._cmds_tank
-            del self._cmds_main
-            del self._cmds_task
-            del self._cmds_system
-            del self._cmds_uart
-            del self._cmds_srvr
-            del self._prefix
+            self._cmds_tank = None
+            self._cmds_main = None
+            self._cmds_task = None
+            self._cmds_system = None
+            self._cmds_uart = None
+            self._cmds_srvr = None
+            self._prefix = None
             #super().__destruct__()
-        except Exception as ex:
-            raise ex
         finally:
             gc.collect()
 ########## CLASS PROPERTIES ##########
     def __version__ (self):
-        return self._v_ch
+        return __VERSION__
     def __repr__ (self):
-        return f'{self.__class__} Ver.: ({self._v_ch})'
+        return f'{self.__class__} Ver.: ({__VERSION__})'
     def __str__ (self):
         return f'{self.__class__}'
 
@@ -100,11 +93,9 @@ class CommandHandlers:
                 handler (par2, params)
             else:
                 raise NotImplementedError(f'Handler for command $x${cmd} {par1}$x$ not implemented in {__class__}')
-        except Exception as ex:
-            raise
         finally:
-            del dispatch_map
-            del _cmd_list
+            dispatch_map = None
+            _cmd_list = None
             gc.collect()
 
 ####### COMMAND HANDLER METHODS ######
@@ -113,7 +104,7 @@ class CommandHandlers:
         self.tank_ctrl.print_tank_state()
     def _hdlr_tank_chiller(self, par2, params):
         if not par2:
-            raise ValueError(f'Missing action parameter')
+            raise ValueError('Missing action parameter')
         if par2 == 'on':
             self.tank_ctrl.relay_c.on()
         elif par2 == 'off':
@@ -124,7 +115,7 @@ class CommandHandlers:
             raise ValueError(f'Invalid action $x${par2}$x$')
     def _hdlr_tank_pump (self, par2, params):
         if not par2:
-            raise ValueError(f'Missing action parameter')
+            raise ValueError('Missing action parameter')
         if par2 == 'on':
             self.tank_ctrl.relay_p.on()
         elif par2 == 'off':
@@ -135,7 +126,7 @@ class CommandHandlers:
             raise ValueError(f'Invalid action $x${par2}$x$')
     def _hdlr_tank_valve (self, par2, params):
         if not par2:
-            raise ValueError(f'Missing action parameter')
+            raise ValueError('Missing action parameter')
         if par2 == 'on':
             self.tank_ctrl.relay_v.on()
         elif par2 == 'off':
@@ -146,7 +137,7 @@ class CommandHandlers:
             raise ValueError(f'Invalid action $x${par2}$x$')    
     def _hdlr_tank_refill(self, par2, params):
         if not par2:
-            raise ValueError(f'Missing refill time parameter')
+            raise ValueError('Missing refill time parameter')
         self.tank_ctrl.max_refill_time = int (par2)
         self._log.aprint (f'{self._tc.label}Max safe refill time: {self._tc.par}{self._tank_ctrl.max_refill_time} [sec]{self._tc.end}')
     def _hdlr_tank_temp(self, par2, params):
@@ -155,7 +146,7 @@ class CommandHandlers:
         self.tank_ctrl.print_trend()
     def _hdlr_tank_all(self, par2, params):
         if not par2:
-            raise ValueError(f'Missing action parameter')
+            raise ValueError('Missing action parameter')
         if par2 == 'on':
             self.tank_ctrl.relay_c.on()
             self.tank_ctrl.relay_p.on()
@@ -172,7 +163,7 @@ class CommandHandlers:
             raise ValueError(f'Invalid action $x${par2}$x$')
     def _hdlr_tank_unit (self, par2, params):
         if not par2:
-            raise ValueError(f'Missing unit parameter')
+            raise ValueError('Missing unit parameter')
         if par2 in ('c', 'C', 'celsius', 'Celsius'):
             self.tank_ctrl.temp_unit = 'C'
         elif par2 in ('f', 'F', 'fahrenheit', 'Fahrenheit'):
@@ -237,7 +228,7 @@ class CommandHandlers:
         if self._uart.is_connected:
             self._uart.post ({'msg': msg})
         else:
-            self._log.warning ({'msg': f'$a$Client not connected$a$', 'src': __name__, 'acc': self._tc.error})
+            self._log.warning ({'msg': '$a$Client not connected$a$', 'src': __name__, 'acc': self._tc.error})
     def _hdlr_uart_state(self, par2=None, params=None):
         self._log.aprint (f'{self._tc.info}UART state:{self._tc.end}')
         self._log.aprint (f'{self._tc.info}------------------------------{self._tc.end}')
@@ -265,7 +256,7 @@ class CommandHandlers:
             val = f'{self._tc.info}running{self._tc.end}' if not self._uart.thread_is_paused else f'{self._tc.critical}paused{self._tc.end}'
             self._log.info ({'msg': f'{self._tc.dvc}|Core 2 thread|{self._tc.end} {val}'})
         else:
-            self._log.warning ({'msg':f'Invalid action: $x${cmd} {par1}$x$ $a${par2}$a$; must be either start or stop', 'acc': self._tc.error})
+            self._log.warning ({'msg':f'Invalid parameter: $a${par2}$a$; must be either start or stop', 'acc': self._tc.error})
             return
     def _hdlr_uart_encrypt(self, par2, params=None):
         self._fio.write_encrypt (in_fn='plain.txt', out_fn='plain.enc')
