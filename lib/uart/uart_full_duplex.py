@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.4"
+__VERSION__ = "0.6.0.6"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401
 # -*- coding: utf-8 -*-
 import _thread
@@ -19,13 +19,15 @@ class FullDuplexUART:
         self._txt_success   = 'successfully'
         try:
             self._log          = logger
+            self._push_event   = None
             self._tc           = tc
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             self._cnf          = cnf
             self._uart: object = None
             self._encoding     = self._cnf['encoding']
             self.buf_size      = self._cnf['uart_buf_size']
-            self._use_crc      = self._cnf['crc']
+            if not self._cnf['crc']:
+                raise ValueError('UART frames require CRC')
             self._parity_map   = lambda x: 0 if x == 'Even' else 1 if x == 'Odd' else None
             self.rx_buffer     = bytearray(self.buf_size)
             self.tx_buffer     = bytearray(self.buf_size)
@@ -132,7 +134,12 @@ class FullDuplexUART:
                 return
             if self.tx_read_ptr == self.tx_write_ptr or self.cts_pin.value() != 0:
                 return
-            self._log.aprint (f'{self._tc.info}Writing: {self._tc.par}{self.tx_buffer [self.tx_read_ptr:self.tx_write_ptr]}{self._tc.end}')
+            if self._push_event is not None:
+                if self.tx_write_ptr >= self.tx_read_ptr:
+                    data = bytes(self.tx_buffer[self.tx_read_ptr:self.tx_write_ptr])
+                else:
+                    data = bytes(self.tx_buffer[self.tx_read_ptr:] + self.tx_buffer[:self.tx_write_ptr])
+                self._push_event({'uart_tx': data})
             while self.tx_read_ptr != self.tx_write_ptr:
                 if self.cts_pin.value() != 0:
                     break
@@ -150,21 +157,30 @@ class FullDuplexUART:
     def can_receive(self):
         self.rts_pin.value(0)  # Set RTS low (ready to receive)
     def send (self, data: bytes):
+        """Enqueue payload bytes as one payload*HHHH\\n frame."""
+        if not isinstance(data, (bytes, bytearray)):
+            return False
+        data = bytes(data)
+        if data.endswith(b'\n'):
+            data = data[:-1]
+        if b'\n' in data:
+            raise ValueError('UART payload contains a newline')
+        if len(data) + 6 > self.buf_size - 1:
+            return False
         if not self.can_send:
             return False  # don’t queue if peer won’t take it
+        data = self.add_crc(data) + b'\n'
         with self.lock:
-            if self._use_crc:
-                data = self.add_crc (data)
+            if len(data) > self._space(self.tx_read_ptr, self.tx_write_ptr):
+                return False
             for b in data:
                 next_ptr = (self.tx_write_ptr + 1) % self.buf_size
-                if next_ptr == self.tx_read_ptr:
-                    return False
                 self.tx_buffer[self.tx_write_ptr] = b
                 self.tx_write_ptr = next_ptr
         return True
 
     def send_line (self, line):
-        """Public: enqueue a line (with newline)"""
+        """Serialize a payload; send() adds its checksum and final newline."""
         if isinstance (line, dict):
             line = bytearray (json.dumps (line, separators=(',', ':')), self._encoding) 
         elif isinstance (line, str):
@@ -173,24 +189,32 @@ class FullDuplexUART:
             pass
         else:
             return False
-        if line[-1] != ord('\n'):
-            line += b'\n'
-        if self._use_crc:
-            line = self.add_crc (line)
         return self.send (line)
 
     def read_line (self):
-        """Return a full line if available, else None"""
-        line = bytearray()
-        with self.lock:
-            ptr = self.rx_read_ptr
-            while ptr != self.rx_write_ptr:
-                byte = self.rx_buffer[ptr]
-                line.append (byte)
-                ptr = (ptr + 1) % self.buf_size
-                if byte == ord ('\n') and line:
-                    self.rx_read_ptr = ptr
-                    return bytes (self.filter_ascii(line))
+        """Return a validated payload plus newline, discarding invalid frames."""
+        remaining = self.buf_size - 1
+        while remaining > 0:
+            line = bytearray()
+            with self.lock:
+                ptr = self.rx_read_ptr
+                while ptr != self.rx_write_ptr:
+                    byte = self.rx_buffer[ptr]
+                    line.append(byte)
+                    ptr = (ptr + 1) % self.buf_size
+                    if byte == ord('\n'):
+                        self.rx_read_ptr = ptr
+                        if self._usage(self.rx_read_ptr, self.rx_write_ptr) < self.rx_low:
+                            self.rts_pin.value(0)
+                        break
+                else:
+                    return None
+            remaining -= len(line)
+            frame = bytes(line[:-1])
+            if self.check_crc(frame):
+                return frame[:-5] + b'\n'
+            if self._push_event is not None:
+                self._push_event({'uart_rx_error': bytes(line)})
         return None
 
     def read_lines (self):
@@ -207,14 +231,7 @@ class FullDuplexUART:
         while True:
             line = self.read_line()
             if line:
-                if self._use_crc:
-                    if self.check_crc (line):
-                        clean = line [:-2]
-                    else:
-                        raise ValueError ('CRC error')
-                else:
-                    clean = line
-                return clean
+                return line
             if timeout_ms is not None and time.ticks_diff(time.ticks_ms(), t_start) > timeout_ms:
                 return None
             time.sleep(0.005)
@@ -222,6 +239,7 @@ class FullDuplexUART:
     def clear_rx_buffer (self):
         with self.lock:
             self.rx_read_ptr = self.rx_write_ptr
+            self.rts_pin.value(0)
     def clear_tx_buffer (self):
         with self.lock:
             self.tx_read_ptr = self.tx_write_ptr
@@ -268,13 +286,15 @@ class FullDuplexUART:
 
     def add_crc (self, data: bytes) -> bytes:
         crc = self.crc16_ccitt (data)
-        return data + bytes ([crc >> 8, crc & 0xFF])
+        return data + (f'*{crc:04X}').encode('ascii')
 
     def check_crc (self, data: bytes) -> bool:
-        if len(data) < 3:
+        if len(data) < 5 or data[-5] != ord('*'):
             return False
-        crc_received = (data[-2] << 8) | data[-1]
-        return self.crc16_ccitt(data[:-2]) == crc_received
+        if any(byte not in b'0123456789ABCDEF' for byte in data[-4:]):
+            return False
+        crc_received = int(data[-4:], 16)
+        return self.crc16_ccitt(data[:-5]) == crc_received
 
     def filter_ascii (self, data: bytes) -> bytes:
         """Filter out non-ASCII characters from the data"""

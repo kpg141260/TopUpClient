@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.12"
+__VERSION__ = "0.6.0.20"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import gc
@@ -269,7 +269,7 @@ class FileOperations:
 # LOGGER UART HANDLER
 ###############################################################################
 class UartHandler:
-    def __init__ (self, uart: None = None, ts_format: str='%Y-%m-%d %H:%M:%S.%f', name='', level='off'):
+    def __init__ (self, uart: UARTComms | None = None, ts_format: str='%Y-%m-%d %H:%M:%S.%f', name='', level='off'):
         print (f'{'UartHandler'}.__init__ ({ts_format}, {name}, {level}, {dbg_lvls(level)})')
         self._uart       = uart
         self._ts_format  = ts_format
@@ -430,7 +430,12 @@ class ConsoleHandler:
 class SocketHandler:
     def __init__ (self, host: str, port: int, name='', level='off', timeout=2):
         if socket is None:
-            raise ImportError ('SocketHandler requires firmware with socket support')
+            raise ImportError('SocketHandler requires firmware with socket support')
+        else:
+            if not 1 <= port <= 65535:
+                raise ValueError('SocketHandler port must be between 1 and 65535')
+            if timeout <= 0:
+                raise ValueError('SocketHandler timeout must be positive and non-zero')
         self._host       = host
         self._port       = port
         self._name       = name
@@ -456,21 +461,29 @@ class SocketHandler:
         if self._sock:
             try:
                 self._sock.close()
-            except Exception:
-                pass
+            except OSError as ex:
+                print(f'[warning] SocketHandler {self._host}:{self._port} close failed: {ex}')
         self._sock = None
+
+    def _connection_failed (self, error):
+        self._retry_started = time.ticks_ms()
+        self.close()
+        print(f'[warning] SocketHandler {self._host}:{self._port} log delivery failed: {error}')
 
     def _connect (self):
         if self._sock:
             return True
+        if self._retry_started is not None and time.ticks_diff(time.ticks_ms(), self._retry_started) < 5000:
+            return False
         try:
-            addr = socket.getaddrinfo(self._host, self._port)[0][-1]
-            self._sock = socket.socket()
+            addr = socket.getaddrinfo(self._host, self._port, 0, socket.SOCK_STREAM)[0]
+            self._sock = socket.socket(addr[0], addr[1])
             self._sock.settimeout(self._timeout)
-            self._sock.connect(addr)
+            self._sock.connect(addr[-1])
+            self._retry_started = None
             return True
-        except Exception:
-            self.close()
+        except OSError as ex:
+            self._connection_failed(ex)
             return False
 
     def write (self, event_log):
@@ -496,16 +509,28 @@ class SocketHandler:
         if not event_str:
             return
 
-        if event_str[-1] != '\n':
-            event_str += '\n'
-
-        packet = json.dumps({'typ': 'log', 'evt': event_str}, separators=(',', ':'))
+        record = {'message': event_str.rstrip('\r\n')}
+        if isinstance(event_log, dict):
+            level = dbg_lvls(event_log['lvl']).name
+            record['level'] = {'TRACE': 'ERROR', 'PRINT': 'INFO'}.get(level, level)
+        packet = (json.dumps(record, separators=(',', ':')) + '\n').encode('utf-8')
 
         if self._connect():
             try:
-                self._sock.send(packet.encode('utf-8'))
-            except Exception:
-                self.close()
+                started = time.ticks_ms()
+                pending = memoryview(packet)
+                sent = 0
+                while sent < len(packet):
+                    remaining = self._timeout - time.ticks_diff(time.ticks_ms(), started) / 1000
+                    if remaining <= 0:
+                        raise OSError('send timed out')
+                    self._sock.settimeout(remaining)
+                    count = self._sock.send(pending[sent:])
+                    if not count:
+                        raise OSError('connection closed during send')
+                    sent += count
+            except OSError as ex:
+                self._connection_failed(ex)
 
         gc.collect()
 
@@ -533,5 +558,5 @@ class SocketHandler:
         if isinstance(event_log, str):
             return event_log
         elif isinstance(event_log, dict):
-            return json.dumps(event_log, separators=(',', ':'))
+            return str(event_log.get('msg', ''))
         return ''

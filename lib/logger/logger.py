@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.6"
+__VERSION__ = "0.6.0.7"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012
 # -*- coding: utf-8 -*-
 import  gc
@@ -79,20 +79,15 @@ class dbg_lvls:
 
 class Logger:
 ###############################################################################
-# LOGGER CLASS WIDE VARIABLES
-###############################################################################
-    # Disable shutdown mode TODO: can possibly be removed later
-    __shutdown: bool = False
-    level      = None
-    log_config: dict | None = None
-
-###############################################################################
 # LOGGER INITIALISATION
 ###############################################################################
-    def __init__(self, log_cnf_fn: str, level=None, name: str='root', version=None):
+    def __init__(self, log_cnf_fn: str, level=None, name: str='root'):
+        Logger.log_config = {}
         print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129minitialising...\u001b[0m')
         gc.collect ()
         _mem = gc.mem_free()
+        self.__shutdown    = False
+        Logger.level       = level
         self._name         = name
         self._is_init      = False
         self._handlers     = deque ([], MAX_Q)
@@ -120,7 +115,7 @@ class Logger:
             self.info ({'msg': f'\u001b[1;38;5;154mLogger initialised.\u001b[38;5;46m Debug level: \u001b[38;5;33m{Logger.level}={int(Logger.level)}\u001b[38;5;46m Memory used: \u001b[38;5;33m{_mem - gc.mem_free()} bytes\u001b[0m', 'eid': 0})
         finally:
             gc.collect()
-    def __destruct__ (self):
+    def destructor (self):
         try:
             self.debug ({'msg': '__destruct__ launched...', 'cls': __class__, 'src': None, 'fnc': None, 'acc': '\u001b[1;38;5;105m' })
             for handler in self._handlers:
@@ -383,7 +378,7 @@ class DefaultLogHandler:
         # If the event is a dictionary proceed
         if not isinstance (event, dict):
             raise TypeError (f'{__class__} {__name__} event must be a string or dictionary')
-        format_str = self._format        
+        format_str = self._format
         if int (event['lvl']) == dbg_lvls.TRACE:
             print_exception (event['exc'])
             event['msg'] = 'Trace output above'
@@ -409,7 +404,8 @@ class DefaultLogHandler:
                     if key == 'eid':
                         if int (value) > 0:
                             value = f'{int (value):06d}'
-                        else: value = ''
+                        else:
+                            value = ''
                     format_str = format_str.replace (f'%{key}%', value)
             else:
                 format_str = format_str.replace (f'%{key}%', '')

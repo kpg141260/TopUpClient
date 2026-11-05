@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.7"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
+__VERSION__ = "0.6.0.25"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import time
 import io
@@ -9,9 +9,54 @@ import ujson           as json
 from   ansi_esc        import text_colors as tc
 from   logger.logger   import dbg_lvls
 
+# Ensure `StringIO` is available across MicroPython ports (io / uio)
+try:
+    import io
+except Exception:
+    io = None
+
+if io is None or not hasattr(io, 'StringIO'):
+    try:
+        import uio as io
+    except Exception:
+        io = None
+
+if io is None or not hasattr(io, 'StringIO'):
+    class _StringIO:
+        def __init__(self):
+            self._buf = []
+        def write(self, s):
+            try:
+                self._buf.append(str(s))
+            except Exception:  # noqa: S110
+                pass
+        def getvalue(self):
+            return ''.join(self._buf)
+        def close(self):
+            self._buf = None
+
+    class _IOMod:
+        pass
+
+    _IOMod.StringIO = _StringIO
+    io = _IOMod
+
+class _ExceptionStringWriter:
+    def __init__(self):
+        self._buf = []
+    def write(self, s):
+        try:
+            self._buf.append(str(s))
+        except Exception:  # noqa: S110
+            pass
+    def getvalue(self):
+        return ''.join(self._buf)
+    def close(self):
+        self._buf = None
+
 def __func_match (match):
     return f'{tc.fnc}{match.group(0)}{tc.end}'
-def __line_match (match):
+def _line_match (match):
     return f'{tc.lno}{match.group(0)}{tc.end}'
 try:
     from sys import print_exception
@@ -59,8 +104,7 @@ class LogFormatter:
         # build instance-local tag map (copy lists so instances don't share mutable lists)
         self._evt_tag_map = self._build_evt_tag_lookup(self._orig_cfg.get('evt_tag_map', {}))
         self._filters     = self._orig_cfg.get('filters', {})
-        # Initialize regex filter helper
-        self.rxf            = regex_filters
+        self.rxf          = regex_filters
         self.rxf.init_cache (self._filters)
 
         self._evt_fmt_lbls = log_fmt['logFormat']['evt_labels'].copy()
@@ -102,8 +146,6 @@ class LogFormatter:
         else:
             self._log_lbls = {}
 
-        #print (f'{tc.info}{self.__class__.__name__} initialized. {tc.par}Color: {tc.success}{self._use_col}{tc.par}, EID: {tc.success}{self._use_eid}{tc.par}, Brackets: {tc.success}{self._use_brkts}{tc.par}, AM/PM: {tc.success}{self._use_ampm}{tc.par}, Timestamp: {tc.success}{self._use_ts}{tc.par}, Label padding: {tc.success}{self._use_pad}{tc.par}, Label alignment: {tc.success}{self._align}{tc.end}')
-        gc.collect()
     def __destruct__ (self):
         self._log_col.clear()
         self._log_col = None
@@ -225,14 +267,24 @@ class LogFormatter:
             col_crit = col_trc = col_err = col_end = col_fn = col_fnc = ''
 
         # capture exception output
-        output = io.StringIO()
+        try:
+            output = io.StringIO()
+        except Exception:
+            output = _ExceptionStringWriter()
+
         try:
             print_exception(exception, output)
         except Exception:
             # fallback if print_exception signature differs
-            output.write(str(exception))
+            try:
+                output.write(str(exception))
+            except Exception:  # noqa: S110
+                pass
         msg = output.getvalue()
-        output.close()
+        try:
+            output.close()
+        except Exception:  # noqa: S110
+            pass
 
         # collapse to single line and simplify text
         msg = ' '.join(msg.splitlines())
@@ -261,13 +313,13 @@ class LogFormatter:
             ('err',   lambda m: f'{col_crit}{m.group(1)}{col_err}'), # SomethingError:
             ('fn',    lambda m: f'{col_fn}{m.group(1)}{col_end}'),   # filename match
             ('func',  lambda m: f'{col_fn}{m.group(1)}{col_end}'),   # filename match
-            ('line',  __line_match)                                  # line N
+            ('line',  _line_match)                                  # line N
         ]
         for name, repl in subs:
             try:
                 pat = self.rxf.compiled_pattern(name)
                 msg = pat.sub(repl, msg)
-            except Exception:
+            except Exception:  # noqa: S110
                 # ignore missing/invalid patterns
                 pass
 
@@ -296,7 +348,7 @@ class LogFormatter:
             self._base_col = ''
             self._accent   = ''
             # Strip any tags from the event message
-            event_log['msg'] = self.strip_tags (event_log['msg'])
+            event_log['msg'] = self.strip_tags (event_log.get('msg', ''))
         # Set label and message colors
         self._evt_tag_map['lbl'][3] = self._base_col
         self._evt_tag_map['msg'][3] = self._base_col
@@ -315,17 +367,20 @@ class LogFormatter:
         # Format timestamp if required
         ts = ''
         if self._use_ts:
-            try:
-                ts = event_log.get('ts')
-            except Exception:
-                pass
-            ts = ts if self.is_timestamp(ts) else self.get_time_stamp(format=self._log_fmt['ts_format'], use_12_hour=self._use_ampm)
+            ts = event_log.get('ts', '')
+            if not self.is_timestamp(ts):
+                ts = self.get_time_stamp(
+                    format=self._log_fmt.get('ts_format', '%Y-%m-%d %H:%M:%S'),
+                    use_12_hour=self._use_ampm
+                ) or ''
         event_log['ts'] = ts
+
         if self._show_mem:
             mem_info = f' [{gc.mem_free()} bytes free]'
             if self._use_col:
                 mem_info = f' {self._evt_tag_map['mem'][3]}{mem_info}{self._log_col.get("end", "")}'
             event_log['mem'] = mem_info
+
         for key in list(event_log.keys()):
             # Remove any keys not in the event format fields, except for 'lvl'
             if key not in self._evt_fmt_lbls and key != 'lvl':
@@ -447,67 +502,37 @@ class LogFormatter:
     ########## STATIC METHODS ##########
     @staticmethod
     def strip_esc_seq(s):
-        out = []
-        i = 0
-        length = len(s)
-        while i < length:
-            c = s[i]
-
-            # --- 1️⃣ Remove ANSI escape sequences ---
-            if c == ('\x1b') and i + 1 < length and s[i + 1] == '[':
-                i += 2
-                while i < length and s[i] != 'm':  # skip until 'm'
-                    i += 1
-                i += 1  # skip 'm'
-                continue
-            # --- otherwise keep character ---
-            out.append(c)
-            i += 1
-        # Clean up extra spaces
-        return str (''.join(out))
+        start = s.find('\x1b[')
+        while start != -1:
+            end = s.find('m', start + 2)
+            if end == -1:
+                return s[:start]
+            s = s[:start] + s[end + 1:]
+            start = s.find('\x1b[', start)
+        return s    
     @staticmethod
     def strip_tags(s, t: str = '$'):
-        # simple pattern to strip any $<letter>$ marker
-        out = []
-        i = 0
         try:
-            length = len(s,)
+            length = len(s)
         except (ValueError, TypeError):
             return s
-        while i < length:
-            c = s[i]
-
-            # --- 2️⃣ Remove $tags$ (1–3 letters, optional spaces) ---
-            if c == '$':
-                j = i + 1
-                letters = 0
-                while j < length and s[j].isalpha() and letters < 3:
-                    j += 1
-                    letters += 1
-                if j < length and s[j] == t:
-                    # Found $x$, $xx$, or $xxx$
-                    i = j + 1
-                    continue
-            out.append(c)
-            i += 1
-        # Clean up extra spaces
-        return str (''.join(out))
-    @staticmethod
-    def strip_brackets (s, f):
-        # simple pattern to strip any brackets
-        out = []
         i = 0
-        length = len(s)
         while i < length:
-            c = s[i]
-            # --- 3️⃣ Remove brackets ---
-            if c in f:
-                i += 1
-                continue
-            out.append(c)
+            if s[i] == '$':
+                j = i + 1
+                while j < length and j - i <= 3 and s[j].isalpha():
+                    j += 1
+                if j < length and s[j] == t:
+                    s = s[:i] + s[j + 1:]
+                    length = len(s)
+                    continue
             i += 1
-        # Clean up extra spaces
-        return str (''.join(out))
+        return s
+    @staticmethod
+    def strip_brackets(s, f):
+        for char in f:
+            s = s.replace(char, '')
+        return s    
     @staticmethod
     def strip_spaces (s):
         cleaned = s.strip()
@@ -581,21 +606,28 @@ class LogFormatter:
         return prefix + format
     @staticmethod
     def is_timestamp(s):
-        if s is None:
+        if not isinstance(s, str):
             return False
-        
-        # List of regex patterns for different timestamp formats
-        patterns = [
-            r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$',           # yyyy-mm-dd hh:mm:ss
-            r'^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}$',           # yyyy/mm/dd hh:mm:ss
-            r'^\d{2}:\d{2}:\d{4} \d{2}:\d{2}:\d{2}$',           # dd:mm:yyyy hh:mm:ss
-            r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$',           # dd/mm/yyyy hh:mm:ss
-            r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} (AM|PM)$',   # yyyy-mm-dd hh:mm:ss AM/PM
-            r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2} (AM|PM)$',   # dd/mm/yyyy hh:mm:ss AM/PM
-            r'^\d{2}:\d{2}:\d{4} \d{2}:\d{2}:\d{2} (AM|PM)$',   # dd:mm:yyyy hh:mm:ss AM/PM
-            # Add more patterns as needed
-        ]
-        return any(re.match(p, s) for p in patterns)
+
+        # Expected examples:
+        # 2026-06-24 18:30:45
+        # 2026/06/24 18:30:45
+        if len(s) < 19:
+            return False
+
+        return (
+            s[0:4].isdigit() and
+            s[4] in ('-', '/') and
+            s[5:7].isdigit() and
+            s[7] in ('-', '/') and
+            s[8:10].isdigit() and
+            s[10] == ' ' and
+            s[11:13].isdigit() and
+            s[13] == ':' and
+            s[14:16].isdigit() and
+            s[16] == ':' and
+            s[17:19].isdigit()
+        )
 
 class regex_filters:
     """
