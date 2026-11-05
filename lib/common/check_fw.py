@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.2"
+__VERSION__ = "0.6.0.1"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 
 import sys

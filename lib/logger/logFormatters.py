@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.25"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
+__VERSION__ = "0.6.0.8"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import time
 import gc

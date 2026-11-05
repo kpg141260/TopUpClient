@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.10"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, UP041, BLE001
+__VERSION__ = "0.6.0.11"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, UP041, BLE001, S110
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio

@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.8"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, E722
+__VERSION__ = "0.6.0.9"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, E722, S110
 # -*- coding: utf-8 -*-
 ########## CLASS IMPORTS ##########
 import sys
