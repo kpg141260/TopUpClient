@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.4"
+__VERSION__ = "0.6.0.6"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, S110, E722, BLE001
 # -*- coding: utf-8 -*-
 try:
@@ -34,7 +34,6 @@ class FILE_IO:
         del self.txt_pde
         del self.txt_rde
         del self.txt_wte
-        
         del self.txt_type
         try:
             self._crypto.destructor()
@@ -105,8 +104,8 @@ class FILE_IO:
                 raise OSError (self.txt_pde.format (__name__, fn))
             raise
 
-        except TypeError as ex:
+        except TypeError:
             raise TypeError (self.txt_type.format (__name__, fn))
 
-        except Exception as ex:
+        except Exception:
             raise OSError (self.txt_wte.format (__name__, fn))

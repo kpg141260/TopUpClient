@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.8"
+__VERSION__ = "0.6.0.12"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import gc
@@ -7,7 +7,7 @@ import time
 import ujson as json
 from   logger.logger import dbg_lvls
 from   collections   import deque
-from   lib.uart      import UARTComms
+from   uart.uart     import UARTComms
 try:
     import usocket as socket
 except ImportError:
@@ -62,12 +62,12 @@ class FileHandler:
         for filter in self._filters:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
-        del self._formatters
-        del self._filters
-        del self._name
-        del self._level
-        del self._log_fn
-        del self._file_ops
+        self._formatters = None
+        self._filters = None
+        self._name = None
+        self._level = None
+        self._log_fn = None
+        self._file_ops = None
         # __fileOperations object counts the number of instantiations and only destroys itself if count is 0
         # This is to avoid memory leaks
         if self._ops_ref_cnt > 0:
@@ -153,10 +153,10 @@ class FileOperations:
             self._ops_ref_cnt -= 1
             return
 
-        del self._max_log_size
-        del self._min_disc_space
-        del self._truncate
-        del self._ts_format
+        self._max_log_size = None
+        self._min_disc_space = None
+        self._truncate = None
+        self._ts_format = None
         gc.collect()
 
     def write (self, event_str, log_fn):
@@ -273,8 +273,8 @@ class UartHandler:
         print (f'{'UartHandler'}.__init__ ({ts_format}, {name}, {level}, {dbg_lvls(level)})')
         self._uart       = uart
         self._ts_format  = ts_format
-        self._formatters = deque ([])
-        self._filters    = deque ([])
+        self._formatters = deque ([], MAX_Q)
+        self._filters    = deque ([], MAX_Q)
         self._name       = name
         self._level      = dbg_lvls(level)
         print (f'UART Handler initialized. Debug level: {self._level}')
@@ -286,9 +286,9 @@ class UartHandler:
         for filter in self._filters:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
-        del self._formatters
-        del self._filters
-        del self._name
+        self._formatters = None
+        self._filters = None
+        self._name = None
         gc.collect()
 
     def write (self, event_log):
@@ -367,16 +367,16 @@ class ConsoleHandler:
         for filter in self._filters:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
-        del self._formatters
-        del self._filters
-        del self._name
+        self._formatters = None
+        self._filters = None
+        self._name = None
         gc.collect()
 
     def write (self, event_log):
-        del event_log['tgt']  # Remove handler name to avoid recursion
         if self._level <= dbg_lvls.OFF:
             return
         if isinstance (event_log, dict):
+            event_log.pop('tgt')  # Remove handler name to avoid recursion
             event_str: str = ''
             if self._level <= event_log['lvl']:
                 event_str: str = ''
@@ -448,8 +448,8 @@ class SocketHandler:
         for filter in self._filters:
             if hasattr (filter, 'destructor'):
                 filter.destructor ()
-        del self._formatters
-        del self._filters
+        self._formatters = None
+        self._filters = None
         gc.collect()
 
     def close (self):

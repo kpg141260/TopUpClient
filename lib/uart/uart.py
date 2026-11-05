@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.8"
+__VERSION__ = "0.6.0.9"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, B012
 # -*- coding: utf-8 -*-
 import  gc
@@ -44,24 +44,25 @@ class UARTComms (UARTHelpersClient):
             self._ext_build = 'na' # build number of the server/external device
             self._ev_buffer = event_buffer
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
-            self._dvc_cnctd:       bool  = False # flag signalling whether the server device is connected
-            self._thread_running:  bool  = False
-            self._hs_active:       bool  = False
-            self._hs_paused:       bool  = False
-            self._sync_active:     bool  = False
-            self._dvc_cnctd:       bool  = False
-            self._cmd:             dict  = {}
-            self._cnf:             dict  = file_io.load_json (cnf_fn)
-            self._uart_buf_size:    int  = self._cnf['uart_buf_size']
-            self._encoding:         str  = self._cnf['encoding']
-            self._hs_rcv_delay:     int  = self._cnf.get('hs_rcv_delay', 0.5)
-            self._uart_interval:  float  = self._cnf.get('uart_interval', 0.01)
-            self._thread_interval: float = self._cnf.get('uart_thread_interval', 0.01)
+            self._dvc_cnctd:        bool = False
+            self._thread_running:   bool = False
+            self._hs_active:        bool = False
+            self._hs_paused:        bool = False
+            self._sync_active:      bool = False
             self._thread_paused:    bool = False
-            self._challenge:        str  = self._cnf.get('challenge_phrase', 'ping')
-            self._response:         str  = self._cnf.get('challenge_response', 'pong')
+            self._cmd:              dict = {}
+            self._cnf:              dict = file_io.load_json (cnf_fn)
+            self._uart_buf_size:     int = self._cnf['uart_buf_size']
+            self._encoding:          str = self._cnf['encoding']
+            self._hs_rcv_delay:      int = self._cnf.get('hs_rcv_delay', 0.5)
+            self._uart_interval:   float = self._cnf.get('uart_interval', 0.01)
+            self._thread_interval: float = self._cnf.get('uart_thread_interval', 0.01)
+            self._challenge:         str = self._cnf.get('challenge_phrase', 'ping')
+            self._response:          str = self._cnf.get('challenge_response', 'pong')
+            
             super().__init__(logger, self._cnf, self._tc)
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
+            
         except Exception:
             self._log.critical ({'msg': f'$p${__VERSION__}$p$ {self._txt_construct} {self._txt_failed}', 'cls': __class__})
             raise

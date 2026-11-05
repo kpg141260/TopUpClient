@@ -1,12 +1,11 @@
-__VERSION__ = "0.6.0.9"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, E722
+__VERSION__ = "0.6.0.12"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, E722, RUF012
 # -*- coding: utf-8 -*-
 try:
     import uasyncio as asyncio
 except:
     import asyncio
 import gc, time, sys
-from typing import ClassVar
 from logger.logger import Logger
 
 
@@ -23,7 +22,7 @@ class TaskManager:
         UNKNOWN    = 8
         SCHEDULED  = 9
 
-    S2T: ClassVar[dict[int, str]] = {
+    S2T: dict[int, str] = {
         0: 'disabled',
         1: 'running',
         2: 'paused',
@@ -36,7 +35,7 @@ class TaskManager:
         9: 'scheduled'
     }
 
-    interval_map: ClassVar[dict[str, str]] = {
+    interval_map: dict[str, str] = {
         'ms': 'milliseconds',
         's':  'seconds',
         'm':  'minutes',
@@ -46,7 +45,6 @@ class TaskManager:
 ########## CLASS INIT AND DESTRUCTOR ##########
     def __init__(self,
                  logger: Logger,  # type: ignore
-                 version,
                  tc,  # type: ignore
                  task_register: dict,
                  cb_shutdown: callable): # type: ignore
@@ -112,7 +110,6 @@ class TaskManager:
                     self.create_task (task_name)
         except KeyError:
             self._log.warning ({'msg': f'{self.txt_task} $p$<{name}>$p$ {self.txt_not_found}', 'acc': self._tc.error})
-
     def create_task(self, task_name: str):
         # Create a task
         original_coro = self.task_register[task_name]['fnc']
@@ -152,7 +149,7 @@ class TaskManager:
                     task_info['state'] = self.State.RECOVERING
 
                     self._log.warning({
-                        'msg': f'Task $f${task_name}$f$ $i${task_info["id"]}$i$ crashed with $x${repr(ex)}$x$ Retry $p${task_info["rc"]}/{task_info["mr"]}$p$',
+                        'msg': f'Task $f${task_name}$f$ $i${task_info["id"]}$i$ crashed with $x${ex!r}$x$ Retry $p${task_info["rc"]}/{task_info["mr"]}$p$',
                         'acc': self._tc.bred
                     })
 
@@ -191,13 +188,13 @@ class TaskManager:
                 else:
                     self.create_task (task_name=task_name)
             except Exception as ex:
-                self._log.error ({'msg': f'Error {repr(ex)} creating $f$<{task_name}>$f$', 'fnc': '__create_all_tasks'})
+                self._log.error ({'msg': f'Error {ex!r} creating $f$<{task_name}>$f$', 'fnc': '__create_all_tasks'})
 
 ########## TASK CONTROL METHODS ##########
     # Wrapper function for __cancel_task
-    def cancel_task (self, task_name: str=None, stop: bool=False): # type: ignore
+    def cancel_task (self, task_name: str|None=None, stop: bool=False): # type: ignore
         asyncio.run (self.__cancel_task (task_name=task_name, stop=stop))
-    async def __cancel_task (self, task_name: str=None, stop: bool=False): # type: ignore
+    async def __cancel_task (self, task_name: str|None=None, stop: bool=False): # type: ignore
         if task_name is None:
             raise ValueError ('Task name must be provided')
         try:
@@ -353,7 +350,7 @@ class TaskManager:
             tasks[task_name] = {'Status': task_info.get('state', 'unknown'), 'Failures': task_info.get('rc', 0)}
         return tasks
 
-    def __log_task_not_found (self, task_name: str | None=None, fnc: str | None=None): # type: ignore
+    def __log_task_not_found (self, task_name: str | None=None, fnc: str | None=None):
         if task_name is not None:
             self._log.warning ({'msg': f'$i${task_name}$i$ {self.txt_not_found}', 'fnc': fnc})
 
@@ -416,7 +413,7 @@ class TaskManager:
         return failed_tasks
     def get_failed_task_count(self):
         return len(self.get_failed_tasks())
-    def task_interval(self, task_name: str, params: list | None = None):
+    def task_interval(self, task_name: str, params: list | None=None):
         # Check that task exists
         if task_name in self.task_register:
             # Check if params are to be set or just to get current interval

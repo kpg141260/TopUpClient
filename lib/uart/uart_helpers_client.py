@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.5"
+__VERSION__ = "0.6.0.6"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, E722
 # -*- coding: utf-8 -*-
 try:
@@ -10,10 +10,10 @@ from uart_thread import UARTthread
 
 class UARTHelpersClient (UARTthread):
     ################# INITIALIZATION AND DESTRUCTION #################
-    def __init__(self, logger, cnf, tc, version):
+    def __init__(self, logger, cnf, tc):
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
-            super().__init__(logger, cnf, tc, version)
+            super().__init__(logger, cnf, tc)
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
         except (Exception) as ex:
             self._log.critical ({'msg': f'$p${__VERSION__}$p$ {self._txt_construct} {self._txt_failed}', 'cls': __class__})

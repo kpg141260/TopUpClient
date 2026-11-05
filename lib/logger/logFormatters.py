@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.3"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.7"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import time
 import io
@@ -27,12 +27,12 @@ except ImportError:  # pragma: no cover
 class LogFormatter:
     def __init__(self,
                  log_fmt: dict,
-                 use_color: bool=None,
-                 use_brkts: bool=None,
-                 use_eid: bool=None,
-                 use_ampm: bool=None,
-                 use_ts: bool=None,
-                 use_pad: bool=None,
+                 use_color: bool | None=None,
+                 use_brkts: bool | None=None,
+                 use_eid: bool | None=None,
+                 use_ampm: bool | None=None,
+                 use_ts: bool | None=None,
+                 use_pad: bool | None=None,
                  align: str='center',
                  name=''):
         self._txt_dm        = ' \x1b[0m sub-dictionary missing'
@@ -106,25 +106,25 @@ class LogFormatter:
         gc.collect()
     def __destruct__ (self):
         self._log_col.clear()
-        del self._log_col
+        self._log_col = None
         self._log_fmt.clear()
-        del self._log_fmt
+        self._log_fmt = None
         self._evt_tag_map.clear()
-        del self._evt_tag_map
+        self._evt_tag_map = None
         self._evt_fmt_lbls.clear()
-        del self._evt_fmt_lbls
+        self._evt_fmt_lbls = None
         self._log_conf.clear()
         self._orig_cfg.clear()
-        del self._orig_cfg
+        self._orig_cfg = None
         self._log_lbls.clear()
-        del self._log_lbls
-        del self._filters
-        del self._log_conf
-        del self._base_col
-        del self._accent
-        del self.rxf
-        del self._name
-        del self._txt_dm
+        self._log_lbls = None
+        self._filters = None
+        self._log_conf = None
+        self._base_col = None
+        self._accent = None
+        self.rxf = None
+        self._name = None
+        self._txt_dm = None
         gc.collect()
     def __repr__ (self):
         return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
@@ -135,7 +135,7 @@ class LogFormatter:
             Updated to minimize temporary allocations and call gc.collect() to free fragmentation. """
         if not isinstance(event_log, (dict, str)):
             raise TypeError(f'{__class__.__name__} event_log must be a \'dictionary\' or \'string\'')
-        if isinstance(event_log, str) or not any(k in event_log for k in self._evt_tag_map.keys()):
+        if isinstance(event_log, str) or not any(k in event_log for k in self._evt_tag_map):
             return event_log
 
         event = self._pre_process_event(event_log)
@@ -222,7 +222,7 @@ class LogFormatter:
             col_fn   = self._log_col.get('success',  '')
             col_end  = self._log_col.get('end',      '')
         else:
-            col_crit = col_trc = col_err = col_end = col_fn = col_fnc = col_end = ''
+            col_crit = col_trc = col_err = col_end = col_fn = col_fnc = ''
 
         # capture exception output
         output = io.StringIO()
@@ -230,10 +230,7 @@ class LogFormatter:
             print_exception(exception, output)
         except Exception:
             # fallback if print_exception signature differs
-            try:
-                output.write(str(exception))
-            except Exception:
-                pass
+            output.write(str(exception))
         msg = output.getvalue()
         output.close()
 
@@ -368,7 +365,7 @@ class LogFormatter:
 
                 # Safely extract parts from tag_info
                 # Structure: [0]=short-tag, [1]=prefix, [2]=suffix, [3]=color
-                short_tag = tag_info[0] if len(tag_info) > 0 else ''
+                short_tag = tag_info[0] if len(tag_info) > 0 else ''  # noqa: F841
                 prefix    = tag_info[1] if len(tag_info) > 1 else ''
                 suffix    = tag_info[2] if len(tag_info) > 2 else ''
                 color     = tag_info[3] if len(tag_info) > 3 else ''
@@ -426,7 +423,7 @@ class LogFormatter:
         if not isinstance (fields, list):
             raise TypeError (f'{__class__} set_event_format \'fields\' must be a list of log-tag specifiers in the form of \'%abc%\'')
         self._evt_fmt_lbls = fields
-    def use_colors (self, use: bool, colors: dict=None):
+    def use_colors (self, use: bool, colors: dict | None=None):
         self._use_col = use
         if self._log_colors == {}:
             self._log_colors = colors if colors is not None else {}
@@ -457,7 +454,7 @@ class LogFormatter:
             c = s[i]
 
             # --- 1️⃣ Remove ANSI escape sequences ---
-            if c == ('\x1b' or '\u001b') and i + 1 < length and s[i + 1] == '[':
+            if c == ('\x1b') and i + 1 < length and s[i + 1] == '[':
                 i += 2
                 while i < length and s[i] != 'm':  # skip until 'm'
                     i += 1
@@ -559,7 +556,7 @@ class LogFormatter:
                 i += 1
         return False
     @staticmethod
-    def get_time_stamp (format: str=None, prefix='', use_12_hour=False) -> str:
+    def get_time_stamp (format: str | None=None, prefix='', use_12_hour=False) -> str:
         if format is None:
             return
         tm = time.gmtime()
@@ -584,6 +581,9 @@ class LogFormatter:
         return prefix + format
     @staticmethod
     def is_timestamp(s):
+        if s is None:
+            return False
+        
         # List of regex patterns for different timestamp formats
         patterns = [
             r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$',           # yyyy-mm-dd hh:mm:ss
@@ -602,17 +602,19 @@ class regex_filters:
     Lightweight regex utility for MicroPython.
     Supports dynamic $x$...$x$ tag matching with caching.
     """
-    _cache         = {}
+    _cache: dict | None = None
 
     @classmethod
     def init_cache(cls, patterns):
         try:
+            if cls._cache is None:
+                cls._cache = {}
             """Compile and cache all predefined regex patterns."""
             for name, pattern in patterns.items():
                 if pattern and isinstance(pattern, str) and name not in cls._cache:
                     cls._cache[name] = re.compile(pattern)
         except Exception as e:
-            cls._cache = {}
+            cls._cache.clear()
             raise RuntimeError (f"Error initializing regex cache: {e}, Pattern: {name} {pattern}")
     @classmethod
     def compiled_pattern (cls, name: str):
