@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.5"
+__VERSION__ = "0.6.0.6"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import  gc, time
@@ -24,10 +24,10 @@ class UARTthread:
         finally:
             gc.collect ()
 
-    def __destruct__ (self):
+    def destructor(self):
         try:
             self._log.debug (f'{self._me} {self._txt_destruct} {self._txt_launch}')
-            self._uart.__destruct__ ()
+            self._uart.destructor()
         finally:
             self._log.debug (f'{self._me} {self._txt_destruct} {self._txt_finish}')
             gc.collect()

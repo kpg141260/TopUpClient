@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.25"
+__VERSION__ = "0.6.0.26"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import time
@@ -71,7 +71,7 @@ except ImportError:  # pragma: no cover
 ###############################################################################
 class LogFormatter:
     def __init__(self,
-                 log_fmt: dict,
+                 config: dict,
                  use_color: bool | None=None,
                  use_brkts: bool | None=None,
                  use_eid: bool | None=None,
@@ -84,22 +84,21 @@ class LogFormatter:
         self._name          = name
         self._log_col       = {}
         self._log_lbls      = {}
-        self._log_conf      = log_fmt['settings'].copy()
-        self._log_fmt       = log_fmt['logFormat'].copy()
+        self._log_fmt       = config['logFormat'].copy()
         # EVENT TAG MAP STRUCTURE: [key]=long-tag [0]=short-tag, [1]=prefix, [2]=suffix, [3]=color
         # Deep-copy the config pieces we will mutate per-instance
         # ujson double-serialize is a cheap deepcopy in MicroPython
         try:
-            self._orig_cfg = json.loads(json.dumps(log_fmt))
+            self._orig_cfg = json.loads(json.dumps(config))
         except Exception:
             # fallback to shallow copies if ujson can't serialize something
             self._orig_cfg = {
-                'evt_tag_map': {k: v[:] for k, v in log_fmt.get('evt_tag_map', {}).items()},
-                'filters':     {k: v    for k, v in log_fmt.get('filters',     {}).items()},
-                'logColors':   {k: v    for k, v in log_fmt.get('logColors',   {}).items()},
-                'logFormat':   {k: v    for k, v in log_fmt.get('logFormat',   {}).items()},
-                'settings':    {k: v    for k, v in log_fmt.get('settings',    {}).items()},
-                'dbg_lvl_map': {k: v[:] for k, v in log_fmt.get('dbg_lvl_map', {}).items()}
+                'evt_tag_map': {k: v[:] for k, v in config.get('evt_tag_map', {}).items()},
+                'filters':     {k: v    for k, v in config.get('filters',     {}).items()},
+                'logColors':   {k: v    for k, v in config.get('logColors',   {}).items()},
+                'logFormat':   {k: v    for k, v in config.get('logFormat',   {}).items()},
+                'settings':    {k: v    for k, v in config.get('settings',    {}).items()},
+                'dbg_lvl_map': {k: v[:] for k, v in config.get('dbg_lvl_map', {}).items()}
             }
         # build instance-local tag map (copy lists so instances don't share mutable lists)
         self._evt_tag_map = self._build_evt_tag_lookup(self._orig_cfg.get('evt_tag_map', {}))
@@ -107,9 +106,9 @@ class LogFormatter:
         self.rxf          = regex_filters
         self.rxf.init_cache (self._filters)
 
-        self._evt_fmt_lbls = log_fmt['logFormat']['evt_labels'].copy()
+        self._evt_fmt_lbls = config['evt_tag_map'].copy()
 
-        # Note: flags defined in log_fmt are overwritten and must be passed explicitly in the constructor
+        # Note: flags defined in config are overwritten and must be passed explicitly in the constructor
         self._use_col   = use_color if use_color is not None else self._orig_cfg['logFormat'].get('use_color', False)
         self._use_eid   = use_eid   if use_eid   is not None else self._orig_cfg['logFormat'].get('use_eid',   False)
         self._use_ampm  = use_ampm  if use_ampm  is not None else self._orig_cfg['logFormat'].get('use_ampm',  False)
@@ -123,7 +122,7 @@ class LogFormatter:
 
         # Set up color scheme if requested
         if use_color:
-            self._log_col  = log_fmt['logColors'].copy()
+            self._log_col  = config['logColors'].copy()
             # Set default colors if not provided
             self._base_col = self._log_col.get  ('off', "\u001b[38;5;8m")
             acc = self._evt_tag_map.get ('acc', None)
@@ -146,22 +145,18 @@ class LogFormatter:
         else:
             self._log_lbls = {}
 
-    def __destruct__ (self):
+    def destructor (self):
         self._log_col.clear()
         self._log_col = None
-        self._log_fmt.clear()
-        self._log_fmt = None
         self._evt_tag_map.clear()
         self._evt_tag_map = None
         self._evt_fmt_lbls.clear()
         self._evt_fmt_lbls = None
-        self._log_conf.clear()
         self._orig_cfg.clear()
         self._orig_cfg = None
         self._log_lbls.clear()
         self._log_lbls = None
         self._filters = None
-        self._log_conf = None
         self._base_col = None
         self._accent = None
         self.rxf = None

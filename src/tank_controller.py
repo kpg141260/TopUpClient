@@ -75,17 +75,17 @@ class TankController:
             self._log.debug ({'msg': f'Version: $p${__VERSION__}$p$ $a$constructor {self._txt_finished}$a$', 'cls': __class__, 'acc': self._tc.success})
             gc.collect   ()
     # Class destructor
-    def __destruct__ (self) -> bool:
+    def destructor (self) -> bool:
         """
             Class destructor to clean up objects and free up memory.
         """
         try:
             self._log.debug ({'msg': f'Version: $p${__VERSION__}$p$ $a$destructor {self._txt_started}...$a$', 'cls': __class__, 'acc': self._tc.waiting})
             # Make sure relay are OFF
-            self.relay_p.__destruct__()
-            self.relay_v.__destruct__()
-            self.relay_c.__destruct__()
-            self.temp_sensor.__destruct__()
+            self.relay_p.destructor()
+            self.relay_v.destructor()
+            self.relay_c.destructor()
+            self.temp_sensor.destructor()
             self._unit_map.clear()
             self._unit_map = None
             self.relay_v = None

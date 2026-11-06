@@ -3,7 +3,7 @@ __VERSION__ = "0.6.0.2"
 
 import sys
 
-MIN_VERSION = (1, 28, 0)
+MIN_VERSION = (1, 23, 0)
 
 def check_firmware_version(major, minor, build):
     required_version = (int(major), int(minor), int(build))
@@ -11,7 +11,8 @@ def check_firmware_version(major, minor, build):
 
     if current_version < required_version:
         raise RuntimeError(
-            "This application requires MicroPython "
-            f"{'.'.join(map(str, required_version))} or later. "
-            f"\nDetected MicroPython: {'.'.join(map(str, current_version))}."
+            "This application requires MicroPython {} or later. \nDetected MicroPython: {}.".format(
+                '.'.join(map(str, required_version)),
+                '.'.join(map(str, current_version))
+            )
         )

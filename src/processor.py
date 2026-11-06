@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.8"
+__VERSION__ = "0.6.0.9"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, E722
 # -*- coding: utf-8 -*-
 ########## CLASS IMPORTS ##########
@@ -16,17 +16,14 @@ except:
 import gc, select, re
 from   machine          import Pin, PWM, RTC
 from   collections      import OrderedDict
-try:
-    from   tank_controller  import TankController
-    from   helpers          import helpers, FixedSizeFIFO as FIFO
-    from   uart.uart        import UARTComms
-    from   logger.logger    import Logger
-    from   task_manager     import TaskManager
-    from   async_handlers   import AsyncHandlers
-    from   cmd_handlers     import CommandHandlers
-except Exception as ex:
-    sys.print_exception (ex)
-    raise ImportError (f'{__name__}: {ex}')
+from   tank_controller  import TankController
+from   helpers          import helpers, FixedSizeFIFO as FIFO
+from   uart.uart        import UARTComms
+from   logger.logger    import Logger
+from   task_manager     import TaskManager
+from   task_register    import task_register
+from   async_handlers   import AsyncHandlers
+from   cmd_handlers     import CommandHandlers
 
 class Processor (CommandHandlers, AsyncHandlers):
     tc = None
@@ -54,13 +51,19 @@ class Processor (CommandHandlers, AsyncHandlers):
         self._helpers: helpers   = helpers (tc=tc)
         self.state: dict         = {}
         self.dbg_lvls            = dbg_lvls
-        self.task_manager: TaskManager
+        self.task_manager: TaskManager | None = None
     ########## LOAD SETTINGS FROM CONFIG FILE ##########
         # Load async task json file
-        self.task_register: dict
         try:
-            self.task_register = file_io.load_json (fn=config['files']['async_tasks'])
-            self.task_register = OrderedDict (sorted (self.task_register.items(), key=lambda item: item[1]["idx"]))
+            data = file_io.load_json (fn=config['files']['async_tasks'])
+            data = OrderedDict (sorted (data.items(), key=lambda item: item[1]["idx"]))
+            task_register.clear()
+            task_register.update(data)
+            
+            # Check that there is a valid task register
+            if task_register == {}:
+                raise ValueError ('Task register cannot be empty')
+
             self.state.setdefault ('tank', config.get('tank').copy())
             self.state.setdefault ('sys',  config.get('sys').copy())
             self.state.setdefault ('dvcs', config.get('dvcs').copy())
@@ -118,12 +121,11 @@ class Processor (CommandHandlers, AsyncHandlers):
             gc.threshold (self._mem_threshold)
             self._log.info ({'msg': f'$a$Memory threshold set$a$ $p$@ {self._mem_threshold} bytes$p$', 'acc': self._tc.success, 'src': __name__})
             self.__bind_async_fncs()
-            self.task_manager = TaskManager (
+            self.task_manager = TaskManager(
                 logger=self._log, 
-                    tc=self._tc, 
-                    task_register=self.task_register, 
-                    cb_shutdown=self.shutdown
-                )
+                tc=self._tc, 
+                cb_shutdown=self.shutdown
+            )
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a$constructor finished$a$', 'cls': __class__, 'src': __name__, 'acc': self._tc.success})
         except Exception as ex:
             self._log.trace ({'exc': ex, 'cls': __class__, 'src': __name__})
@@ -134,7 +136,7 @@ class Processor (CommandHandlers, AsyncHandlers):
             gc.collect()
     ###### METHODS ######
     def __bind_async_fncs (self):
-        for task_name, task_info in self.task_register.items():
+        for task_name, task_info in task_register.items():
             cls_name = task_info.get('cls', None)
             if not cls_name:
                 continue
@@ -145,7 +147,7 @@ class Processor (CommandHandlers, AsyncHandlers):
             try:
                 coro = getattr (instance, task_name)
                 if callable (coro):
-                    self.task_register[task_name]['fnc'] = coro
+                    task_register[task_name]['fnc'] = coro
                 else:
                     self._log.warning ({'msg': f'$p${task_name}$p$ in class $p${cls_name}$p$ is not callable', 'src': __name__})
             except AttributeError:
@@ -160,8 +162,8 @@ class Processor (CommandHandlers, AsyncHandlers):
             # Delete asynchronous task manager
             if self.task_manager is not None:
                 self.task_manager = None
-            self.task_register.clear()
-            self.task_register = None
+            task_register.clear()
+            task_register = None
             self._uart_watchdog_event = None
             self._tank_ctrl = None
             for key in self.state:
@@ -332,10 +334,10 @@ class Processor (CommandHandlers, AsyncHandlers):
                     self.task_manager.destructor()
             # Cleanup the UART Comms module
             if self._uart is not None:
-                self._uart.__destruct__()
+                self._uart.destructor()
             # Shutdown the tank controller 
             if self._tank_ctrl is not None:
-                self._tank_ctrl.__destruct__()
+                self._tank_ctrl.destructor()
             # Call the parent shutdown process, which will call the processor destructor
             self._cb_parent_shutdown ()
         except Exception as ex:

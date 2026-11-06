@@ -21,7 +21,7 @@ class CommandHandlers:
         self.load_cmd_lists ()
         super().__init__()
 
-    def __destruct__(self):
+    def destructor(self):
         try:
             self._cmds_main.clear()
             self._cmds_task.clear()
@@ -36,7 +36,7 @@ class CommandHandlers:
             self._cmds_uart = None
             self._cmds_srvr = None
             self._prefix = None
-            #super().__destruct__()
+            #super().destructor()
         finally:
             gc.collect()
 ########## CLASS PROPERTIES ##########

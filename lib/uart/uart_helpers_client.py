@@ -25,10 +25,10 @@ class UARTHelpersClient (UARTthread):
         finally:
             gc.collect()
 
-    def __destruct__ (self):
+    def destructor (self):
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
-            super().__destruct__()
+            super().destructor()
         finally:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
             gc.collect()

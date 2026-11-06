@@ -20,7 +20,7 @@ try:
     import time
     import machine
     from ansi_esc import text_colors as tc
-    from file_io import FILE_IO as file_io
+    from file_io import FILE_IO
     from helpers import helpers
     from logFormatters import LogFormatter
     from logger.logger import Logger
@@ -40,7 +40,7 @@ except Exception as ex:
 ME       = f'PTCC {__VERSION__}' 
 CNF_FILE = '/config/config.json'
 
-_file_io:     file_io | None = file_io (use_encryption=False, seed_file='', shift=0)
+_file_io:     FILE_IO | None = FILE_IO (use_encryption=False, seed_file='', shift=0)
 _logger:       Logger | None = None
 _processor: Processor | None = None
 _help_fncs:   helpers | None = helpers ()
@@ -66,7 +66,7 @@ def shutdown (hard_reset: bool = True, error: bool = False):
     # Cleanup the processor object
     if _processor and isinstance (_processor, Processor):
             _processor.stop()
-            _processor._destruct_()
+            _processor.destructor()
             _processor = None
             gc.collect()
     if _config and isinstance (_config, dict) and bool (_config.get('showMEm_info')):
@@ -74,7 +74,7 @@ def shutdown (hard_reset: bool = True, error: bool = False):
         _config.clear()
         _config = None
         
-    if _file_io and isinstance (_file_io, file_io):
+    if _file_io and isinstance (_file_io, FILE_IO):
             _file_io.destructor()
             _file_io = None
             gc.collect()
@@ -148,18 +148,18 @@ def init_logger (config) -> Logger:
             # Construct the log formatters based on the configuration
             if enable.get('console', False) or enable.get('file', False):
                 lfnc = LogFormatter(
-                    log_fmt = logger.log_config,
+                    config = log_config,
                     name    = 'lfnc'
                 )
             lfc = LogFormatter(
-                log_fmt = logger.log_config,
+                config = log_config,
                 name    = 'lfc'
             )
             
             if enable.get('console', False):
                 ch = ConsoleHandler(
                     writer=logger.aWriter(),
-                    ts_format=logger.log_config['logFormat']['ts_format'],
+                    ts_format=log_config['logFormat']['ts_format'],
                     name='ptcc',
                     level = log_config['tgt_dbg_lvls']['console_handler']
                 )
@@ -169,7 +169,7 @@ def init_logger (config) -> Logger:
             if enable.get('file', False):
                 fh = FileHandler(
                     filename=_config['files']['log_file'],
-                    truncate=logger.log_conf['settings']['truncate'],
+                    truncate=log_config['settings']['truncate'],
                     name='ptcc',
                     level = log_config['tgt_dbg_lvls']['file_handler']
                 )
