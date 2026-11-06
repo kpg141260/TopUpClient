@@ -1,5 +1,7 @@
 ## 2026-11-06
 
+* Switched `lib/uart/uart_full_duplex.py` to native UART RTS/CTS flow control and removed manual RTS writes. Finite receive-capacity burst tests for both peers are in TopUpServer `tests/test_uart_frames.py`; wiring and pin ownership are documented in TopUpServer `docs/uart_protocol.md`. Physical RTC synchronization remains unverified.
+
 * Fixed UART byte loss in `lib/uart/uart_full_duplex.py`: receive reads are bounded by ring capacity, and unaccepted writes retain their bytes for retry. Shared regression coverage is in TopUpServer `tests/test_uart_frames.py`. Physical RTC synchronization still requires device verification.
 
 # Changes

@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.10"
+__VERSION__ = "0.6.0.26"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import time
@@ -163,18 +163,19 @@ class LogFormatter:
         self._name = None
         self._txt_dm = None
         gc.collect()
+
     def __repr__ (self):
         return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
+
     def __str__ (self):
         return f'{self.__class__.__name__}'
+
     def format_output(self, event_log):
         """ Format the event log dictionary into a string according to the specified format fields.
             Updated to minimize temporary allocations and call gc.collect() to free fragmentation. """
         if not isinstance(event_log, (dict, str)):
             raise TypeError(f'{__class__.__name__} event_log must be a \'dictionary\' or \'string\'')
-        if isinstance(event_log, str):
-            return event_log if self._use_col else self.strip_esc_seq(event_log)
-        if not any(k in event_log for k in self._evt_tag_map):
+        if isinstance(event_log, str) or not any(k in event_log for k in self._evt_tag_map):
             return event_log
 
         event = self._pre_process_event(event_log)

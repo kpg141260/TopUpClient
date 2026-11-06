@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.7"
+__VERSION__ = "0.6.0.9"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import _thread
@@ -31,12 +31,7 @@ class FullDuplexUART:
             self._parity_map   = lambda x: 0 if x == 'Even' else 1 if x == 'Odd' else None
             self.rx_buffer     = bytearray(self.buf_size)
             self.tx_buffer     = bytearray(self.buf_size)
-            # Flow control thresholds
-            self.rx_high       = int (self.buf_size * 0.75)
-            self.rx_low        = int (self.buf_size * 0.5)
-            # RTS/CTS pins (manual control)
-            self.rts_pin = Pin (self._cnf['pin_rts'], Pin.OUT)
-            self.rts_pin.value(1)  # Start with RTS low (NOT ready to receive)
+            self.rts_pin = Pin (self._cnf['pin_rts'])
             self.cts_pin = Pin (self._cnf['pin_cts'], Pin.IN, Pin.PULL_UP)
             self.rx_read_ptr   = 0
             self.rx_write_ptr  = 0
@@ -86,9 +81,8 @@ class FullDuplexUART:
                              tx=self._cnf['pin_tx'], 
                              rx=self._cnf['pin_rx'], 
                              rts=self._cnf['pin_rts'], 
-                             cts=self._cnf['pin_cts'])
-            # Start as ready to receive
-            self.rts_pin.value(0)
+                             cts=self._cnf['pin_cts'],
+                             flow=UART.RTS | UART.CTS)
             self._log.debug ({'msg': f'$a$UART {self._cnf['uart_id']} initialised successfully - $a$ Baud: $p${self._cnf['baud_rate']}$p$, ' +  
                              f'DB: $p${self._cnf['data_bits']}$p$, ' +   
                              f'SB: $p${self._cnf['stop_bits']}$p$, ' +   
@@ -115,7 +109,6 @@ class FullDuplexUART:
             with self.lock:
                 space = self._space(self.rx_read_ptr, self.rx_write_ptr)
                 if not space:
-                    self.rts_pin.value(1)
                     return
                 data = self._uart.read(min(available, space))
                 if not data:
@@ -124,11 +117,6 @@ class FullDuplexUART:
                     next_ptr = (self.rx_write_ptr + 1) % self.buf_size
                     self.rx_buffer[self.rx_write_ptr] = b
                     self.rx_write_ptr = next_ptr
-                usage = self._usage(self.rx_read_ptr, self.rx_write_ptr)
-                if usage > self.rx_high:
-                    self.rts_pin.value(1)  # stop sender
-                elif usage < self.rx_low:
-                    self.rts_pin.value(0)  # resume sender
 
     def _write (self):
         with self.lock:
@@ -156,7 +144,8 @@ class FullDuplexUART:
         return self.cts_pin.value() == 0
 
     def can_receive(self):
-        self.rts_pin.value(0)  # Set RTS low (ready to receive)
+        """UART hardware controls receive readiness."""
+        return
     def send (self, data: bytes):
         """Enqueue payload bytes as one payload*HHHH\\n frame."""
         if not isinstance(data, (bytes, bytearray)):
@@ -205,8 +194,6 @@ class FullDuplexUART:
                     ptr = (ptr + 1) % self.buf_size
                     if byte == ord('\n'):
                         self.rx_read_ptr = ptr
-                        if self._usage(self.rx_read_ptr, self.rx_write_ptr) < self.rx_low:
-                            self.rts_pin.value(0)
                         break
                 else:
                     return None
@@ -240,7 +227,6 @@ class FullDuplexUART:
     def clear_rx_buffer (self):
         with self.lock:
             self.rx_read_ptr = self.rx_write_ptr
-            self.rts_pin.value(0)
     def clear_tx_buffer (self):
         with self.lock:
             self.tx_read_ptr = self.tx_write_ptr

@@ -7,10 +7,10 @@
             "major": 0,
             "minor": 6,
             "patch": 0,
-            "build": 114,
+            "build": 115,
             "ctime": "",
             "mtime": "",
-            "time": "10-29-21",
+            "time": "13-37-53",
             "date": "2026-11-06"
         },
         "project_info": {
@@ -25,11 +25,11 @@
         }
     },
     "ptcc_main.py": {
-        "build": 114,
-        "hash": "3befc45bd311d2cb296e0a4619b85ebc8bf7348a931438184042f5626754aea0",
+        "build": 115,
+        "hash": "4ef4e636c57cc1a89ceb2562f3874ec92cf698fa9fa3950f815d009dd9d2e7dc",
         "has_changes": true,
         "ctime": "2026-05-05 16:19:06",
-        "mtime": "2026-11-06 10:29:20"
+        "mtime": "2026-11-06 13:37:51"
     },
     "lib/uart/uart_helpers_client.py": {
         "build": 9,
@@ -109,11 +109,11 @@
         "mtime": "2026-11-06 10:29:20"
     },
     "lib/uart/uart_full_duplex.py": {
-        "build": 6,
-        "hash": "d5dd7d27e7cc2e8c50ebe5a2a35f5d0e28861344bd9295d984bbf9cc297872ba",
+        "build": 9,
+        "hash": "04636e99fc918b535b703cf83abca76db6f1e4e776ae7c29151e50dd122107ac",
         "has_changes": true,
         "ctime": "2026-06-12 20:35:39",
-        "mtime": "2026-11-06 10:29:20"
+        "mtime": "2026-11-06 14:03:20"
     },
     "lib/logger/aio.py": {
         "build": 3,
@@ -123,11 +123,11 @@
         "mtime": "2026-11-04 22:17:55"
     },
     "lib/logger/logFormatters.py": {
-        "build": 9,
-        "hash": "448132bfbcc972a30c1f9f3fec50105e0efb3ff24daee5ed4d02108ed2362274",
+        "build": 10,
+        "hash": "d264b90e1b81b10c3f00ba654820f5ef183bea5c591b00fb3029c5f7e54ee256",
         "has_changes": true,
         "ctime": "2026-06-24 13:53:33",
-        "mtime": "2026-11-06 10:29:20"
+        "mtime": "2026-11-06 13:37:51"
     },
     "lib/logger/logger.py": {
         "build": 8,
