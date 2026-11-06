@@ -18,7 +18,7 @@
     "encoding": "utf-8",
     "uart_buf_size": 512,
     "uart_interval": 0.01,
-    "uart_thread_interval": 0.5,
+    "uart_thread_interval": 0.05,
     "ev_buf_size": 10,
     "crc": true
 }

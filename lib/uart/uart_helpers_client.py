@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.7"
+__VERSION__ = "0.6.0.8"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, E722, BLE001, S110
 # -*- coding: utf-8 -*-
 try:
@@ -8,6 +8,7 @@ except:
 import time, json, gc, sys, machine
 from uart_thread import UARTthread
 from uart_link import UARTLink
+from uart_rtc import UARTClockSync
 
 class UARTHelpersClient (UARTthread):
     ################# INITIALIZATION AND DESTRUCTION #################
@@ -17,6 +18,7 @@ class UARTHelpersClient (UARTthread):
             self._link = UARTLink(self._my_info, False, cnf, lambda message: self._uart.send_line(message),
                                   self.__push_event, self._link_changed)
             super().__init__(logger, cnf, tc)
+            self._rtc = UARTClockSync(False, self.send_line, self._log, self._link.timeout_ms, self._set_rtc)
             self._uart._push_event = self.__push_event
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
         except (Exception):
@@ -33,28 +35,17 @@ class UARTHelpersClient (UARTthread):
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_finish}$a$', 'cls': __class__, 'acc': self._tc.success})
             gc.collect()
 
-    # Function to synchronise time between server and client
+    def _set_rtc(self, stamp_ms):
+        stamp = (stamp_ms + 500) // 1000
+        tm = time.gmtime(stamp)
+        machine.RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
+
     def _sync_rtc(self, message=None):
-        if message is None:
-            self.read_line()
-            return 0 if self._time_synchronised else None
-        try:
-            stamp = message['cmd']['data']['sv_ts']
-            if type(stamp) not in (int, float):
-                raise ValueError('invalid server timestamp')
-            tm = time.localtime(stamp)
-            machine.RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
-            reply = {'rsp': {'act': 'sync', 'sta': 'ok',
-                             'data': {'cl_ts': time.time(), 'sv_ts': int(stamp)}}}
-            if not self.send_line(reply):
-                self._log.warning({'msg': 'RTC reply could not be queued'})
-                return None
-            self._time_synchronised = True
-            self._log.info({'msg': f'RTC synchronized with {self._dvc_name}'})
-            return 0
-        except (KeyError, TypeError, ValueError, OverflowError) as ex:
-            self._log.warning({'msg': f'Invalid UART clock request: {ex}'})
-            return None
+        if message is not None:
+            self._rtc.receive(message)
+        self._rtc.poll()
+        self._time_synchronised = self._rtc.synced
+        return 0 if self._rtc.synced else None
 
     # Push event to event buffer
     def __push_event (self, event: dict):

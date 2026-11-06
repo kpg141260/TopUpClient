@@ -14,3 +14,8 @@
 
 * Aligned client UART initialization: `src/processor.py` passes the application identity supplied by the entry point to `UARTComms`; `lib/uart/uart_helpers_client.py` uses the three-argument worker constructor and its own module version for diagnostics; `lib/uart/uart.py` preserves configuration-load errors during constructor cleanup.
 * Added host regression checks in `tests/test_uart_initialization.py` for identity propagation, UART initialization/destruction, and original configuration/hardware error propagation. These checks do not start Core 1 or verify physical UART communication.
+
+
+## RTC synchronization
+
+* Replaced RTC backward-correction retries with protocol v2 measurement, one client RTC adjustment, and independent one-second verification. Added identical `lib/uart/uart_rtc.py` and `tests/test_uart_rtc.py` on server and client; updated role helpers, `lib/uart/uart.py`, and `src/async_handlers.py` for normal receive dispatch, bounded retries, session reset, cancellation, and server-side timing/result diagnostics. The client UART watchdog now checks actual session activity and `config/comms.json` uses a 0.05-second worker interval. Server `tests/test_uart_pair.py` and `tests/async_yield_test.py` cover the new exchange. Both firmwares must be updated together; physical timing remains to be verified.

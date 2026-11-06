@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.10"
+__VERSION__ = "0.6.0.11"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, B012, S110
 # -*- coding: utf-8 -*-
 import  gc
@@ -221,6 +221,8 @@ class UARTComms (UARTHelpersClient):
         self._dvc_cnctd = self._link.is_connected
         self._hs_active = self._link.state == 'handshaking'
         if not self._dvc_cnctd:
+            self._rtc.reset()
+            self._sync_active = False
             self._time_synchronised = False
             self._dvc_name = self._dvc_ver = self._dvc_build = 'na'
             self._uart.clear_buffers()
@@ -235,6 +237,9 @@ class UARTComms (UARTHelpersClient):
         self._link.disconnect(reason, notify)
 
     def service_connection(self):
+        self._rtc.poll()
+        self._time_synchronised = self._rtc.synced
+        self._sync_active = self._rtc.active
         self._link.poll(self.can_send)
         if not self.is_connected:
             self.read_line()
@@ -305,8 +310,9 @@ class UARTComms (UARTHelpersClient):
                 continue
             if self._link.receive(message) or not self.is_connected:
                 continue
-            if not self._link.server and message.get('cmd', {}).get('act') == 'sync':
-                self._sync_rtc(message)
+            if self._rtc.receive(message):
+                self._time_synchronised = self._rtc.synced
+                self._sync_active = self._rtc.active
                 continue
             return raw
         return None
