@@ -24,10 +24,10 @@ class UARTthread:
         finally:
             gc.collect ()
 
-    def __destruct__ (self):
+    def destructor(self):
         try:
             self._log.debug (f'{self._me} {self._txt_destruct} {self._txt_launch}')
-            self._uart.__destruct__ ()
+            self._uart.destructor()
         finally:
             self._log.debug (f'{self._me} {self._txt_destruct} {self._txt_finish}')
             gc.collect()

@@ -49,7 +49,7 @@ class Relay:
             raise KeyError(f'{self._tc.function}{__name__}.init{self._tc.end} -> Missing key in config dictionary.')
         self._log.info({'msg': f'Relay $p${self._name}$p$ initialized with ID $p${self._id}$p$, Pin: $p${self._relay_pin}$p$, Active level: $p${self._active_level}$p$, Block time $p${self._block_time} sec$p$'})
 
-    def __destruct__(self):
+    def destructor(self):
         self.off()
         self._timer.deinit()
 
@@ -168,9 +168,9 @@ class TempSensor:
         else:
             self._idx = 0
 
-    def __destruct__(self):
+    def destructor(self):
         if self._ds_sensor:
-            del self._ds_sensor
+            self._ds_sensor = None
         if self._sensors:
             self._sensors = None
         self._temps = None

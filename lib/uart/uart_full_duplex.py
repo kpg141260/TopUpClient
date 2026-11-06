@@ -53,7 +53,7 @@ class FullDuplexUART:
         finally:
             gc.collect()
 
-    def __destruct__ (self):
+    def destructor (self):
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             self._uart.deinit()

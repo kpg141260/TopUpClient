@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.7"
+__VERSION__ = "0.6.0.8"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012, BLE001, S110
 # -*- coding: utf-8 -*-
 import  gc
@@ -84,12 +84,12 @@ class Logger:
 # LOGGER INITIALISATION
 ###############################################################################
     def __init__(self, log_cnf_fn: str, level=None, name: str='root'):
-        Logger.log_config = {}
+        self._log_config = {}
         print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129minitialising...\u001b[0m')
         gc.collect ()
         _mem = gc.mem_free()
-        self.__shutdown    = False
-        Logger.level       = level
+        self._shutdown    = False
+        self._level        = level
         self._name         = name
         self._is_init      = False
         self._handlers     = deque ([], MAX_Q)
@@ -106,27 +106,27 @@ class Logger:
             # Get the debug level descriptions from configuration file
             # Note: This must be done before setting the log level to reflect padding if so desired
             # Set debug level values retrieved from config file
-            dbg_lvls.setup (Logger.log_config['dbg_lvl_map'])
+            dbg_lvls.setup (self._log_config['dbg_lvl_map'])
             # Set the log level - this can ONLY happen after the debug levels have been setup
-            Logger.level      = Logger.log_config.get('tgt_dbg_lvls').get('logger', 'inf') if level is None else dbg_lvls(level)
-            self._log_id      = int (Logger.log_config['logFormat'].get('eid_value', 1))
+            self._level      = self._log_config.get('tgt_dbg_lvls').get('logger', 'inf') if level is None else dbg_lvls(level)
+            self._log_id      = int (self._log_config['logFormat'].get('eid_value', 1))
             self._name        = name
-            self._def_handler = DefaultLogHandler (format=Logger.log_config['logFormat']['evt_format'], writer=self._writer)
+            self._def_handler = DefaultLogHandler (format=self._log_config['logFormat']['evt_format'], writer=self._writer)
             self._get_ts      = DefaultLogHandler.get_time_stamp
             self._is_init     = True
-            self.info ({'msg': f'\u001b[1;38;5;154mLogger initialised.\u001b[38;5;46m Debug level: \u001b[38;5;33m{Logger.level}={int(Logger.level)}\u001b[38;5;46m Memory used: \u001b[38;5;33m{_mem - gc.mem_free()} bytes\u001b[0m', 'eid': 0})
+            self.info ({'msg': f'\u001b[1;38;5;154mLogger initialised.\u001b[38;5;46m Debug level: \u001b[38;5;33m{self._level}={int(self._level)}\u001b[38;5;46m Memory used: \u001b[38;5;33m{_mem - gc.mem_free()} bytes\u001b[0m', 'eid': 0})
         finally:
             gc.collect()
     def destructor (self):
         try:
-            self.debug ({'msg': '__destruct__ launched...', 'cls': __class__, 'src': None, 'fnc': None, 'acc': '\u001b[1;38;5;105m' })
+            self.debug ({'msg': 'destructor launched...', 'cls': __class__, 'src': None, 'fnc': None, 'acc': '\u001b[1;38;5;105m' })
             for handler in self._handlers:
-                if hasattr (handler, '__destruct__'):
-                    handler.__destruct__()
+                if hasattr (handler, 'destructor'):
+                    handler.destructor()
             self._handlers = None
-            if Logger.log_config is not None:
-                Logger.log_config.clear()
-                Logger.log_config = None
+            if self._log_config is not None:
+                self._log_config.clear()
+                self._log_config = None
             self._def_handler = None
             self._writer = None
             self._reader = None
@@ -144,20 +144,20 @@ class Logger:
 
     def __load_and_check_log_config_file (self, log_cnf_fn: str):
         with open (log_cnf_fn, 'r') as f:
-            Logger.log_config = json.load (f)
-        if 'settings' not in Logger.log_config:
+            self._log_config = json.load (f)
+        if 'settings' not in self._log_config:
             raise KeyError (f'Logger config file {log_cnf_fn} missing \'settings\' section!')
-        if 'tgt_dbg_lvls' not in Logger.log_config:
+        if 'tgt_dbg_lvls' not in self._log_config:
             raise KeyError (f'Logger config file {log_cnf_fn} missing \'tgt_dbg_lvls\' section!')
-        if 'dbg_lvl_map' not in Logger.log_config:
+        if 'dbg_lvl_map' not in self._log_config:
             raise ValueError (f'Logger config file {log_cnf_fn} missing \'dbg_lvl_map\' section!')
-        if 'logFormat' not in Logger.log_config:
+        if 'logFormat' not in self._log_config:
             raise KeyError (f'Logger config file {log_cnf_fn} missing \'logFormat\' section!')
-        if 'logColors' not in Logger.log_config and Logger.log_config['logFormat'].get('use_color', None):
+        if 'logColors' not in self._log_config and self._log_config['logFormat'].get('use_color', None):
             raise KeyError (f'Logger config file {log_cnf_fn} missing \'logColors\' section!')
-        if 'evt_tag_map' not in Logger.log_config:
+        if 'evt_tag_map' not in self._log_config:
             raise KeyError (f'Logger config file {log_cnf_fn} missing \'evt_tag_map\' section!')
-        if 'filters' not in Logger.log_config:
+        if 'filters' not in self._log_config:
             raise KeyError (f'Logger config file {log_cnf_fn} missing \'filters\' section!')
 ###############################################################################
 # LOGGER MAIN METHODS
@@ -207,7 +207,7 @@ class Logger:
         else:
             # Process event_log string
             event_log = f'{self.get_time_stamp()} [{dbg_lvls(level).desc()}] {event_log}'
-        if not Logger.__shutdown:
+        if not self._shutdown:
             # Use the async log function
             try:
                 _ = asyncio.current_task()
@@ -220,32 +220,32 @@ class Logger:
 # LOGGER PUBLIC LOG METHODS
 ###############################################################################
     def debug (self, event_log):
-        if Logger.level == dbg_lvls.OFF:
+        if self._level == dbg_lvls.OFF:
             return
-        if Logger.level <= dbg_lvls.DEBUG:
+        if self._level <= dbg_lvls.DEBUG:
             self.log (event_log, int (dbg_lvls.DEBUG))
     def info (self, event_log):
-        if Logger.level == dbg_lvls.OFF:
+        if self._level == dbg_lvls.OFF:
             return
-        if Logger.level <= dbg_lvls.INFO:
+        if self._level <= dbg_lvls.INFO:
             self.log (event_log, int (dbg_lvls.INFO))
     def warning (self, event_log):
-        if Logger.level == dbg_lvls.OFF:
+        if self._level == dbg_lvls.OFF:
             return
-        if Logger.level <= dbg_lvls.WARNING:
+        if self._level <= dbg_lvls.WARNING:
             self.log (event_log, int (dbg_lvls.WARNING))
     def error (self, event_log):
-        if Logger.level == dbg_lvls.OFF:
+        if self._level == dbg_lvls.OFF:
             return
-        if Logger.level <= dbg_lvls.ERROR:
+        if self._level <= dbg_lvls.ERROR:
             self.log (event_log, int (dbg_lvls.ERROR))
     def critical (self, event_log):
-        if Logger.level == dbg_lvls.OFF:
+        if self._level == dbg_lvls.OFF:
             return
-        if Logger.level <= dbg_lvls.CRITICAL:
+        if self._level <= dbg_lvls.CRITICAL:
             self.log (event_log, int (dbg_lvls.CRITICAL))
     def trace (self, event_log):
-        if Logger.level == dbg_lvls.OFF:
+        if self._level == dbg_lvls.OFF:
             return
         self.log (event_log, int (dbg_lvls.TRACE))
     def aprint (self, message, end='\n'):
@@ -292,10 +292,10 @@ class Logger:
         if handler in self._handlers:
             self._handlers.remove (handler)
     def get_level (self):
-        return Logger.level
+        return self._level
     def set_level (self, level):
-        Logger.level = dbg_lvls (level)
-        self.info ({'msg': f'Log level changed to: $p${[Logger.level]}={int (Logger.level)}$p$'})
+        self._level = dbg_lvls (level)
+        self.info ({'msg': f'Log level changed to: $p${[self._level]}={int (self._level)}$p$'})
     def getLogger (self):
         return self
     def aWriter (self):
@@ -314,35 +314,35 @@ class Logger:
     def basicColors (self, **kwargs):
         for key, value in kwargs.items():
             if isinstance (value, dict):
-                Logger.log_config['logColors'] = {k: v for k, v in value.items().copy()}
+                self._log_config['logColors'] = {k: v for k, v in value.items().copy()}
             else:
-                if key in Logger.log_config['logColors']:
-                    Logger.log_config['logColors'][key] = value
+                if key in self._log_config['logColors']:
+                    self._log_config['logColors'][key] = value
                 else:
                     raise AttributeError (f'basicColors has no attribute {key}')
     # @classmethod
     def basicFormat (self, **kwargs):
         for key, value in kwargs.items():
             if isinstance (value, dict):
-                Logger.log_config['logFormat'] = {k: v for k, v in value.items().copy()}
+                self._log_config['logFormat'] = {k: v for k, v in value.items().copy()}
             else:
-                if key in Logger.log_config['logFormat']:
-                    Logger.log_config['logFormat'][key] = value
+                if key in self._log_config['logFormat']:
+                    self._log_config['logFormat'][key] = value
                 else:
                     raise AttributeError (f'basicFormat has no attribute {key}')
     @classmethod
     def debugLevelMap (self, **kwargs):
         for key, value in kwargs.items():
             if isinstance (value, dict):
-                Logger.log_config['dbg_lvl_map'] = {int(k): v for k, v in value.items()}
+                self._log_config['dbg_lvl_map'] = {int(k): v for k, v in value.items()}
             else:
-                if int(key) in Logger.log_config['dbg_lvl_map']:
-                    Logger.log_config['dbg_lvl_map'][int(key)] = value
+                if int(key) in self._log_config['dbg_lvl_map']:
+                    self._log_config['dbg_lvl_map'][int(key)] = value
                 else:
                     raise AttributeError (f'basicConfig has no attribute {key}')
     @classmethod
     def shutdownMode (self):
-        self.__shutdown = True
+        self._shutdown = True
     def get_time_stamp (self):
         return self._get_ts()
     @staticmethod

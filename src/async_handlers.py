@@ -11,6 +11,7 @@ except ImportError:
     import json
 import gc, sys, select
 from   machine import PWM, Pin
+from task_register import task_register
 
 # AsyncHandlers class to handle asynchronous operations
 # This class is a placeholder and can be extended with specific async methods, 
@@ -28,7 +29,7 @@ class AsyncHandlers:
         try:
             while True:
                 self._tank_ctrl.check_tank ()
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise
@@ -41,7 +42,7 @@ class AsyncHandlers:
         try:
             while True:
                 self._tank_ctrl.check_temperature ()
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise
@@ -54,10 +55,10 @@ class AsyncHandlers:
         gc.collect()
         try:
             while True:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
+                if task_register[name]['state'] != self.as_state.PAUSED:
                     # Control the blink rate of the LED, 
                     self._led.toggle()
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self._led.off()
             self.__log_task_cancelling (name=name, task_info=task_info)
@@ -102,9 +103,9 @@ class AsyncHandlers:
         gc.collect()
         try:
             while True:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
+                if task_register[name]['state'] != self.as_state.PAUSED:
                     gc.collect()
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise
@@ -116,7 +117,7 @@ class AsyncHandlers:
             while True:
                 if not self._shutdown and sys.stdin in select.select([sys.stdin], [], [], 0)[0] and not self._processing_cmd:  # Check 
                         await self._cmd_buffer.add_char(sys.stdin.read(1))
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise
@@ -151,7 +152,7 @@ class AsyncHandlers:
                             else:
                                 self._log.warning ({'msg':f'Unknown Command: $a${data[0]}$a$', 'acc': self._tc.critical})
                         gc.collect()
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise
@@ -164,12 +165,12 @@ class AsyncHandlers:
         self.__log_task_started(name=name, task_info=task_info)
         try:
             while True:
-                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                if (task_register[name]['state'] != self.as_state.PAUSED
                         and self._uart.is_connected and not self._uart.thread_is_paused):
                     req = self._uart.read_line()
                     if req:
                         self._log.debug({'msg': f'UART received: {req.decode(self._encoding).strip()}'})
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling(name=name, task_info=task_info)
             raise
@@ -178,10 +179,10 @@ class AsyncHandlers:
         self.__log_task_started(name=name, task_info=task_info)
         try:
             while True:
-                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                if (task_register[name]['state'] != self.as_state.PAUSED
                         and not self._uart.thread_is_paused):
                     self._uart.check_connection_timeout()
-                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep(task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling(name=name, task_info=task_info)
             raise
@@ -191,7 +192,7 @@ class AsyncHandlers:
         gc.collect()
         try:
             while True:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
+                if task_register[name]['state'] != self.as_state.PAUSED:
                     while len (self._ev_buffer) > 0:
                         event = self._ev_buffer.get()
                         if isinstance(event, dict) and event !={}:
@@ -205,16 +206,19 @@ class AsyncHandlers:
                                 event['msg'] = f'UART frame rejected (CRC/format): {data!r}'
                             if 'ts' not in event:
                                 event['ts'] = self._log.get_time_stamp()
-                            if   event['lvl'] == self.dbg_lvls.OFF:      return
-                            elif event['lvl'] == self.dbg_lvls.DEBUG:    self._log.debug   (event)
-                            elif event['lvl'] == self.dbg_lvls.INFO:     self._log.info    (event)
-                            elif event['lvl'] == self.dbg_lvls.WARNING:  self._log.warning (event)
-                            elif event['lvl'] == self.dbg_lvls.ERROR:    self._log.error   (event)
-                            elif event['lvl'] == self.dbg_lvls.CRITICAL: self._log.critical(event)
-                            elif event['lvl'] == self.dbg_lvls.TRACE:    self._log.trace   (event)
-                            elif event['lvl'] == self.dbg_lvls.PRINT:    self._log.aprint  (event['msg'])
+                                
+                            level = event.get('lvl', self.dbg_lvls.OFF)
+                            
+                            if   level == self.dbg_lvls.OFF:      return
+                            elif level == self.dbg_lvls.DEBUG:    self._log.debug   (event)
+                            elif level == self.dbg_lvls.INFO:     self._log.info    (event)
+                            elif level == self.dbg_lvls.WARNING:  self._log.warning (event)
+                            elif level == self.dbg_lvls.ERROR:    self._log.error   (event)
+                            elif level == self.dbg_lvls.CRITICAL: self._log.critical(event)
+                            elif level == self.dbg_lvls.TRACE:    self._log.trace   (event)
+                            elif level == self.dbg_lvls.PRINT:    self._log.aprint  (event['msg'])
                         await asyncio.sleep(0)
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise
@@ -225,12 +229,12 @@ class AsyncHandlers:
         self.__log_task_started(name=name, task_info=task_info)
         try:
             while True:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
+                if task_register[name]['state'] != self.as_state.PAUSED:
                     if self._uart.thread_health() != 'running' or self._uart.thread_is_paused:
                         self._uart.disconnect('UART worker unavailable')
                     else:
                         self._uart.service_connection()
-                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep(task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self._uart.disconnect('connection task cancelled', notify=True)
             self.__log_task_cancelling(name=name, task_info=task_info)
@@ -240,10 +244,10 @@ class AsyncHandlers:
         self.__log_task_started(name=name, task_info=task_info)
         try:
             while not self._uart.is_synchronised:
-                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                if (task_register[name]['state'] != self.as_state.PAUSED
                         and self._uart.is_connected and not self._uart.thread_is_paused):
                     self._uart.sync_rtc()
-                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep(task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling(name=name, task_info=task_info)
             raise
@@ -253,7 +257,7 @@ class AsyncHandlers:
         gc.collect()
         try:
             while True:
-                if self._uart.is_connected and self.task_register['as_tank']['state'] and not self.task_register['as_update']['paused']and self._uart.cts:
+                if self._uart.is_connected and self._uart.cts and task_register['as_tank_check']['state'] not in (self.as_state.PAUSED, self.as_state.STOPPED):
                     self.state['sys']['client']['c_tmp'] = self._helpers.get_core_temp()
                     self.state['sys']['client']['mem_f'] = gc.mem_free()  # type: ignore
                     self.state['sys']['client']['mem_a'] = gc.mem_alloc() # type: ignore
@@ -262,7 +266,7 @@ class AsyncHandlers:
                     self._uart.post ({'status': {'sys':  self.state['sys']}})
                     self._uart.post ({'status': {'mem':  self.state['mem']}})
                     gc.collect()
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise
@@ -274,14 +278,14 @@ class AsyncHandlers:
         gc.collect()
         while True:
             try:
-                if self.task_register[name]['state'] != self.as_state.PAUSED:
+                if task_register[name]['state'] != self.as_state.PAUSED:
                     self.task_manager.task_status_all (failed_only = True)
                     val = f'{self._tc.info}{self.s2t[self.as_state.RUNNING]}{self._tc.end}' if not self._uart.thread_is_paused else f'{self._tc.waiting}{self.s2t[self.as_state.PAUSED]}{self._tc.end}'
                     self._log.debug ({'msg': f'$v$Core 2 thread$v$ {val}'})
                     if self.task_manager.get_failed_task_count () > 3: 
                         # There is a major problem if there are more than 3 failed tasks
                         self.stop (exc=True)
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
             except asyncio.CancelledError:
                 self.__log_task_cancelling (name=name, task_info=task_info)
                 raise
@@ -294,10 +298,10 @@ class AsyncHandlers:
         gc.collect()
         try:
             while True:
-                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                if (task_register[name]['state'] != self.as_state.PAUSED
                         and self._uart.thread_health() != 'running'):
                     self._uart.disconnect('UART worker unavailable')
-                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep(task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling(name=name, task_info=task_info)
             raise
@@ -306,10 +310,10 @@ class AsyncHandlers:
         self.__log_task_started(name=name, task_info=task_info)
         try:
             while True:
-                if (self.task_register[name]['state'] != self.as_state.PAUSED
+                if (task_register[name]['state'] != self.as_state.PAUSED
                         and self._uart.thread_health() != 'running'):
                     self._uart.disconnect('UART worker unavailable')
-                await asyncio.sleep(self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep(task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling(name=name, task_info=task_info)
             raise
@@ -317,7 +321,7 @@ class AsyncHandlers:
 ########## HELPER METHODS ##########
     def __log_task_started (self, name: str, task_info: dict):
         if task_info['id'] == 0:
-            task_info['id'] = self.task_register.get(name, {}).get('task_id', 0)
+            task_info['id'] = task_register.get(name, {}).get('task_id', 0)
             
         self._log.info ({'msg': f'$f${name}$f$ $i${task_info['id']}$i$ $a$has started$a$. Interval = $p${task_info['intv']} sec$p$', 'acc': self._tc.success})
     def __log_task_cancelling (self, name: str, task_info: dict):
@@ -327,7 +331,7 @@ class AsyncHandlers:
         self._log.info ({'msg': f'$f${name}$f$ $i${task_info['id']}$i$$a$ {self.as_state.PAUSED}$a$', 'acc': self._tc.waiting})
         
     def __bind_async_fncs (self):
-        for task_name, task_info in self.task_register.items():
+        for task_name, task_info in task_register.items():
             cls_name = task_info.get ('cls', None)
             if not cls_name:
                 continue # static or direct function
@@ -338,7 +342,7 @@ class AsyncHandlers:
             try:
                 coro = getattr (instance, task_name)
                 if callable (coro):
-                    self.task_register[task_name]['function'] = coro
+                    task_register[task_name]['function'] = coro
                 else:
                     self._log.warning ({'msg': f'Function $p${task_name}$p$ in class $p${cls_name}$p$ is not callable', 'src': __name__})
             except AttributeError:
@@ -350,7 +354,7 @@ class AsyncHandlers:
         gc.collect()
         try:
             err = 'Test Error'
-            cnt: int = self.task_register[name].get ('retry_count', 0)
+            cnt: int = task_register[name].get ('retry_count', 0)
             while True:
                 if cnt == 0:
                     raise KeyError (err)
@@ -364,7 +368,7 @@ class AsyncHandlers:
                     raise TypeError (err)
                 if cnt == 5:
                     raise MemoryError (err)
-                await asyncio.sleep (self.task_register[name]['intv'] * self.task_register[name]['mx'])
+                await asyncio.sleep (task_register[name]['intv'] * task_register[name]['mx'])
         except asyncio.CancelledError:
             self.__log_task_cancelling (name=name, task_info=task_info)
             raise

@@ -74,10 +74,10 @@ class UARTComms (UARTHelpersClient):
                 self._cnf = None
             gc.collect()
 
-    def __destruct__ (self):
+    def destructor (self):
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
-            super().__destruct__()
+            super().destructor()
             self._dvc_cnctd = False
             self._ext_name = None
             self._ext_ver = None

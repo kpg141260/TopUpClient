@@ -2,7 +2,7 @@ __VERSION__ = "0.6.0.13"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012, BLE001, RUF010, S110
 # -*- coding: utf-8 -*-
 import lib.common.check_fw as cfw
-cfw.check_firmware_version (1, 28, 0) # If the current firmware is lower then the specified version an Exception will be raised
+cfw.check_firmware_version (1, 23, 0) # If the current firmware is lower then the specified version an Exception will be raised
 import asyncio
 import gc, sys
 from task_register import task_register
@@ -46,10 +46,6 @@ class TaskManager:
                  tc,
                  cb_shutdown: callable):
         gc.collect()
-
-        # Check that there is a valid task register
-        if task_register == {}:
-            raise ValueError ('Task register cannot be empty')
 
         self._mem                  = gc.mem_free()  
         self._log                  = logger
@@ -189,7 +185,7 @@ class TaskManager:
                 else:
                     self.create_task (task_name=task_name)
             except Exception as ex:
-                self._log.error ({'msg': f'Error {repr(ex)} creating $f$<{task_name}>$f$', 'fnc': '__create_all_tasks'})
+                self._log.error ({'msg': f'Error {ex!r} creating $f$<{task_name}>$f$', 'fnc': '__create_all_tasks'})
 
 ########## TASK CONTROL METHODS ##########
     # Wrapper function for __cancel_task
