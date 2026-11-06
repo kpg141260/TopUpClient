@@ -1,7 +1,8 @@
 __VERSION__ = "0.6.0.26"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001
 # -*- coding: utf-8 -*-
 import time
+import io
 import gc
 import re
 import ujson           as json
@@ -326,14 +327,11 @@ class LogFormatter:
         del subs
         gc.collect()
         return msg
-
     def _pre_process_event ( self, event_log: dict):
-        event_log = event_log.copy()
         # Reset base color and label color
         # EVENT TAG STRUCTURE: [0]=short-tag, [1]=prefix, [2]=suffix, [3]=color
         self._evt_tag_map['lbl'][3] = ''
         self._evt_tag_map['msg'][3] = ''
-
         # Process event_log dictionary keys according to specified format
         if self._use_col:
             # Set the base color of the event
@@ -349,12 +347,10 @@ class LogFormatter:
         # Set label and message colors
         self._evt_tag_map['lbl'][3] = self._base_col
         self._evt_tag_map['msg'][3] = self._base_col
-
         # If an exception object is provided, format it and set as the message
         if 'exc' in event_log and event_log['exc'] is not None:
             event_log['msg'] = self._format_trace(event_log['exc'])
             event_log.pop('exc', None)
-
         # Format log identifier with leading zeros and prefix, if defined
         eid_formatted = ''
         if self._use_eid:
@@ -363,7 +359,6 @@ class LogFormatter:
             except (ValueError, TypeError):
                 eid_formatted = ''
         event_log['eid'] = eid_formatted
-
         # Format timestamp if required
         ts = ''
         if self._use_ts:
@@ -389,7 +384,6 @@ class LogFormatter:
                 if  event_log[key] is not None and isinstance (event_log[key], str):
                     # Remove any leading/trailing brackets
                     event_log[key] = self.strip_brackets (event_log[key], self._filters['brackets'])
-
         return event_log
     def _colorize(self, text):
         """
@@ -540,7 +534,6 @@ class LogFormatter:
         while '  ' in cleaned:
             cleaned = cleaned.replace('  ', ' ')
         return cleaned
-    
     @staticmethod
     def pad_string(s, length, align: str='center'):
         """
@@ -559,7 +552,6 @@ class LogFormatter:
         left = (padcnt // 2) + (padcnt % 2)
         right = padcnt - left
         return ' ' * left + s + ' ' * right
-    
     @staticmethod
     def has_tags(s: str):
         """Return True if text contains any $x$, $xx$ or $xxx$ tag (no regex)."""
@@ -583,7 +575,6 @@ class LogFormatter:
             else:
                 i += 1
         return False
-    
     @staticmethod
     def get_time_stamp (format: str | None=None, prefix='', use_12_hour=False) -> str:
         if format is None:
@@ -608,7 +599,6 @@ class LogFormatter:
         for key, value in format_map.items():
             format = format.replace(key, value)
         return prefix + format
-
     @staticmethod
     def is_timestamp(s):
         if not isinstance(s, str):
@@ -643,8 +633,6 @@ class regex_filters:
 
     @classmethod
     def init_cache(cls, patterns):
-        if cls._cache is None:
-            cls._cache = {}
         try:
             if cls._cache is None:
                 cls._cache = {}
@@ -655,7 +643,6 @@ class regex_filters:
         except Exception as e:
             cls._cache.clear()
             raise RuntimeError (f"Error initializing regex cache: {e}, Pattern: {name} {pattern}")
-
     @classmethod
     def compiled_pattern (cls, name: str):
         """Return compiled pattern or None if not present (compat wrapper)."""

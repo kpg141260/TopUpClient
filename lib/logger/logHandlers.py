@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.13"
+__VERSION__ = "0.6.0.20"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import gc
@@ -437,12 +437,11 @@ class SocketHandler:
             if timeout <= 0:
                 raise ValueError('SocketHandler timeout must be positive and non-zero')
         self._host       = host
-        self._port       = int(port)
+        self._port       = port
         self._name       = name
         self._level      = dbg_lvls(level)
         self._timeout    = timeout
         self._sock       = None
-        self._retry_started = None
         self._formatters = deque ([], MAX_Q)
         self._filters    = deque ([], MAX_Q)
 
@@ -465,16 +464,6 @@ class SocketHandler:
             except OSError as ex:
                 print(f'[warning] SocketHandler {self._host}:{self._port} close failed: {ex}')
         self._sock = None
-        if sock:
-            try:
-                sock.close()
-            except OSError as ex:
-                print(f'[warning] SocketHandler {self._host}:{self._port} close failed: {ex}')
-
-    def _connection_failed (self, error):
-        self._retry_started = time.ticks_ms()
-        self.close()
-        print(f'[warning] SocketHandler {self._host}:{self._port} log delivery failed: {error}')
 
     def _connection_failed (self, error):
         self._retry_started = time.ticks_ms()

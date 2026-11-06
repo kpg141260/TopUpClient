@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.13"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012, BLE001, RUF010, S110
+__VERSION__ = "0.6.0.25"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012, BLE001, RUF010
 # -*- coding: utf-8 -*-
 import lib.common.check_fw as cfw
 cfw.check_firmware_version (1, 23, 0) # If the current firmware is lower then the specified version an Exception will be raised

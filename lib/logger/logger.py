@@ -1,9 +1,8 @@
 __VERSION__ = "0.6.0.8"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012, BLE001, S110
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012
 # -*- coding: utf-8 -*-
 import  gc
 import  time
-from    typing import ClassVar
 import  ujson as json
 from    collections   import deque
 from    logger.aio    import stdinHandler, stdoutHandler
@@ -36,7 +35,6 @@ class DbgLevel:
     def __ge__(self, other): return self.value >= int(other)
     def __hash__(self):      return hash(self.value)
     def desc (self):         return self.description
-
 class dbg_lvls:
     OFF:        DbgLevel
     DEBUG:      DbgLevel
@@ -136,12 +134,10 @@ class Logger:
         finally:
             print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129m__destruct__ finished...\u001b[0m')
             gc.collect()
-
     def __repr__ (self):
         return f'{self.__class__.__name__} Ver.: ({__VERSION__})'
     def __str__ (self):
         return f'{self.__class__.__name__}'
-
     def __load_and_check_log_config_file (self, log_cnf_fn: str):
         with open (log_cnf_fn, 'r') as f:
             self._log_config = json.load (f)
@@ -190,11 +186,11 @@ class Logger:
     def log (self, event_log, level: int):
         """Wrapper function to allow logging from both async and sync contexts"""
         # Set the log level and label
-        # If the event_log is a dictionary, format accordingly
+        # If the event_log is a dictionary, format accordingly 
         if isinstance (event_log, dict):
             event_log['lvl'] = level
             event_log['lbl'] = dbg_lvls(level).desc()
-
+            
             # Increment log id only if the initial value is > 0 and the eid_format is > 0
             # This ensures that changes to basicFormat are reflected in the log
             event_log['eid'] = self._log_id
@@ -215,7 +211,7 @@ class Logger:
             except RuntimeError:
                 # Use the sync log function
                 self._log (event_log)
-
+            
 ###############################################################################
 # LOGGER PUBLIC LOG METHODS
 ###############################################################################
@@ -352,7 +348,7 @@ class Logger:
             return ' ' * (padding // 2) + s + ' ' * (padding // 2)
         else:
             return ' ' * ((padding // 2) + 1) + s + ' ' * (padding // 2)
-
+    
 ###############################################################################
 # LOGGER DEFAULT HANDLER
 ###############################################################################
@@ -413,7 +409,7 @@ class DefaultLogHandler:
                     format_str = format_str.replace (f'%{key}%', value)
             else:
                 format_str = format_str.replace (f'%{key}%', '')
-
+                
         cleaned = format_str.strip()
         while '  ' in cleaned:
             cleaned = cleaned.replace('  ', ' ')
