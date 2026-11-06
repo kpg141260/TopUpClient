@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.8"
+__VERSION__ = "0.6.0.9"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, RUF012, BLE001, S110
 # -*- coding: utf-8 -*-
 import  gc
@@ -132,7 +132,7 @@ class Logger:
             self._lock_reader = None
             self._lock_logger = None
         finally:
-            print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129m__destruct__ finished...\u001b[0m')
+            print (f'\u001b[38;5;240m{DefaultLogHandler.get_time_stamp()} \u001b[1;38;5;129m[debug] \u001b[38;5;99m<{__class__}> \u001b[1;38;5;129mdestructor finished...\u001b[0m')
             gc.collect()
     def __repr__ (self):
         return f'{self.__class__.__name__} Ver.: ({__VERSION__})'

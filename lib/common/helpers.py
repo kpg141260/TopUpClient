@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.1"
+__VERSION__ = "0.6.0.2"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import gc, time 
@@ -73,7 +73,7 @@ class helpers:
         self._temp_sensor = ADC (self._adc_pin)
         helpers.tc = tc
 
-    def __destruct__ (self):
+    def destructor (self):
         del self._temp_sensor
 
     # Internal temperature sensor is connected to ADC channel 4
