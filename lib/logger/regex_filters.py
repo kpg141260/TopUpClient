@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.3"
+__VERSION__ = "0.6.0.4"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 import re
 
@@ -11,7 +11,7 @@ class regex_filters:
     re_par_pattern    = re.compile(r'\$\p\$(.*?)\$\p\$')
     re_dvc_pattern    = re.compile(r'\$\v\$(.*?)\$\v\$')
     re_xtr_pattern    = re.compile(r'\$\x\$(.*?)\$\x\$')
-    re_format_pattern = re.compile(r'\$[acdefipx]\$')
+    re_format_pattern = re.compile(r'\$[acdefipvx]\$')
     re_remove_pattern = re.compile(r'\$\a\$|\$c\$|\$\e\$|\$\f\$|\$i\$|\$\p\$|\$v\$|\$\x\$')
     re_ip4_pattern    = re.compile(r'(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b')
     re_web_pattern    = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')

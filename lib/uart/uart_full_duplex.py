@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.6"
+__VERSION__ = "0.6.0.7"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import _thread
@@ -110,16 +110,18 @@ class FullDuplexUART:
         return self.buf_size - self._space(r, w)
 
     def _read (self):
-        if self._uart.any():
-            data = self._uart.read()
-            if not data:
-                return
+        available = self._uart.any()
+        if available:
             with self.lock:
+                space = self._space(self.rx_read_ptr, self.rx_write_ptr)
+                if not space:
+                    self.rts_pin.value(1)
+                    return
+                data = self._uart.read(min(available, space))
+                if not data:
+                    return
                 for b in data:
                     next_ptr = (self.rx_write_ptr + 1) % self.buf_size
-                    if next_ptr == self.rx_read_ptr:
-                        # Drop byte
-                        continue
                     self.rx_buffer[self.rx_write_ptr] = b
                     self.rx_write_ptr = next_ptr
                 usage = self._usage(self.rx_read_ptr, self.rx_write_ptr)
@@ -144,9 +146,8 @@ class FullDuplexUART:
                 if self.cts_pin.value() != 0:
                     break
                 b = self.tx_buffer[self.tx_read_ptr]
-                if bytes([b]) == b'':
+                if not self._uart.write(bytes([b])):
                     break
-                self._uart.write(bytes([b]))
                 self.tx_read_ptr = (self.tx_read_ptr + 1) % self.buf_size
 
     @property

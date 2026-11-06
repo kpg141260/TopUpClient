@@ -7,11 +7,11 @@
             "major": 0,
             "minor": 6,
             "patch": 0,
-            "build": 113,
+            "build": 114,
             "ctime": "",
             "mtime": "",
-            "time": "12-56-22",
-            "date": "2026-11-04"
+            "time": "10-29-21",
+            "date": "2026-11-06"
         },
         "project_info": {
             "language": "Python",
@@ -25,46 +25,46 @@
         }
     },
     "ptcc_main.py": {
-        "build": 113,
-        "hash": "7c6c4511eb5ab1edba96a4808ea3de128e4e923fd99a212127a8a5f790586115",
+        "build": 114,
+        "hash": "3befc45bd311d2cb296e0a4619b85ebc8bf7348a931438184042f5626754aea0",
         "has_changes": true,
         "ctime": "2026-05-05 16:19:06",
-        "mtime": "2026-11-04 12:56:21"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/uart/uart_helpers_client.py": {
-        "build": 8,
-        "hash": "e5fa38263ac3ac1f740cc9fd84be8cf339afb4d5dee8f82ec55c21d70cf67df4",
+        "build": 9,
+        "hash": "87f0c95cc464370c6f08c269842cd52916616dd1db63681018d642c0875c6e81",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-11-06 09:01:33"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/uart/uart_thread.py": {
-        "build": 6,
-        "hash": "0e583f403870971915035f3c3348f83b602559eba10a2d8c5531c881594fa683",
+        "build": 7,
+        "hash": "357818d821f86496deeba33aab27ca744250b094ef0fe34d03eebe778a7db520",
         "has_changes": true,
         "ctime": "2026-06-12 19:58:37",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "src/task_manager.py": {
-        "build": 13,
-        "hash": "6d74b72adc7bdd6a11f4391c508202deb9b2d1145ea85ee6654ff797fe7f89ae",
+        "build": 25,
+        "hash": "c628c550a6f453b19cde4cb33511c9fe06f76710a738a15b49be5106ac05ecec",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:37:59"
     },
     "lib/uart/uart.py": {
-        "build": 11,
-        "hash": "cbf5b2d48737841fb9d58c4e9bbff8a3f1edc25f496908fe78c0e4863617b8dc",
+        "build": 12,
+        "hash": "998ada0c5ff8ec2eaa1143b1ae2d6dbd6877a08e1955dc68be17642fb192355c",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-11-06 09:01:33"
+        "mtime": "2026-11-06 10:29:20"
     },
     "src/async_handlers.py": {
-        "build": 12,
-        "hash": "a37eb77d080ad015338504ddcdd52efaa5ad588e97979cee2526f467e446d59f",
+        "build": 13,
+        "hash": "5e574e65625363d33058f20afd3fd480f09068b923c52c42c7b31f636c349c95",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-11-06 09:01:33"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/common/file_io.py": {
         "build": 7,
@@ -74,18 +74,18 @@
         "mtime": "2026-11-04 22:17:55"
     },
     "src/tank_controller.py": {
-        "build": 6,
-        "hash": "7a1a00a2d12424741e53cbb08f7c1c76abb215326650cf19fdbba09570192a68",
+        "build": 7,
+        "hash": "ea4cc5f0d429fa0453b3cb8339ba5401287cd575b7be7c387d3112b237449fa9",
         "has_changes": true,
         "ctime": "2026-06-12 20:00:09",
-        "mtime": "2026-11-04 13:20:09"
+        "mtime": "2026-11-06 10:29:20"
     },
     "src/devices.py": {
-        "build": 6,
-        "hash": "bde5b9faae1ff0c74d06590bb9a3e76ed26cf2296a9a4190601942383d9d6138",
+        "build": 7,
+        "hash": "825a6ea3af9a2dbdffdd2d7a4181ff9c8fe4f462239b26d60a8cc604767823b1",
         "has_changes": true,
         "ctime": "2026-05-05 13:22:53",
-        "mtime": "2026-11-04 13:28:18"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/common/cipher.mpy": {
         "build": 1,
@@ -95,25 +95,25 @@
         "mtime": "2026-05-05 13:22:29"
     },
     "src/cmd_handlers.py": {
-        "build": 8,
-        "hash": "d352090620ee685d6aa429476cc0535a947e83fbcf13459e700d038a6ede99c0",
+        "build": 9,
+        "hash": "698bad0b9c25d94717b39ee09ce52185b49de20834fd4f46314e02967176fd0f",
         "has_changes": true,
         "ctime": "2026-06-12 19:58:37",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "src/processor.py": {
-        "build": 9,
-        "hash": "33601ad076d29db3c997bd3c5d56bbfb3bce80eb704a8eefdcd29de954845176",
+        "build": 10,
+        "hash": "b4caca5ec6f1917e682e28133a394898484138da113dda36b0f3bc69d40fbdca",
         "has_changes": true,
         "ctime": "2026-05-05 13:22:57",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/uart/uart_full_duplex.py": {
-        "build": 5,
-        "hash": "f728e1d7928abb165aa3ab929de403234965cd9aba2d718f85da48b834bafdcb",
+        "build": 6,
+        "hash": "d5dd7d27e7cc2e8c50ebe5a2a35f5d0e28861344bd9295d984bbf9cc297872ba",
         "has_changes": true,
         "ctime": "2026-06-12 20:35:39",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/logger/aio.py": {
         "build": 3,
@@ -123,46 +123,46 @@
         "mtime": "2026-11-04 22:17:55"
     },
     "lib/logger/logFormatters.py": {
-        "build": 8,
-        "hash": "d52ef99579f405a74a2e0fe39f7bf3d8a41a15a278ec7d5435fb6cebc5d3fd5e",
+        "build": 9,
+        "hash": "448132bfbcc972a30c1f9f3fec50105e0efb3ff24daee5ed4d02108ed2362274",
         "has_changes": true,
         "ctime": "2026-06-24 13:53:33",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/logger/logger.py": {
-        "build": 7,
-        "hash": "f7be95186289514db17e27fea18ad18bf1e2ec4ae6124939c526f4fffe338e82",
+        "build": 8,
+        "hash": "7e265815c86456d906c5b435bba0c81d5394e0d56abf664eef85b15d438eb907",
         "has_changes": true,
         "ctime": "2026-06-24 13:53:33",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/logger/logHandlers.py": {
-        "build": 13,
-        "hash": "fa8ea406efb2501a692518263815d87040adf4cdf26969d8019ecb6ee4ed37dd",
+        "build": 14,
+        "hash": "7187e20a0b41c91af7143e5b3af70b2e4f9a5a947cd8a0dd96a58153168d1eca",
         "has_changes": true,
         "ctime": "2026-06-24 13:53:33",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/logger/regex_filters.py": {
-        "build": 3,
-        "hash": "89603d157e7008594a395deb888d546ac413a6fcd347623f02eecd91898f0430",
+        "build": 4,
+        "hash": "5967ffcf977c6b7f67b91ec3b9916dae105d062699f39c056ff98b8aff2a6941",
         "has_changes": true,
         "ctime": "2026-06-24 13:53:33",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 11:39:05"
     },
     "lib/uart/shared_core.py": {
-        "build": 3,
-        "hash": "75cf4372d5717bb8950a7626efcaf4d23fb7473fe6d769eb88e4570fef09cb7d",
+        "build": 4,
+        "hash": "c3a1acd1e166d24759dd39b3508a59a8f1d2626015bf28f394c7496625d466d8",
         "has_changes": true,
         "ctime": "2026-10-30 18:37:45",
-        "mtime": "2026-11-04 20:44:12"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/common/check_fw.py": {
-        "build": 1,
-        "hash": "73f37af2cb17deb841b05e8200770e3562b7317d22f6d89430ff1b6c987645e6",
+        "build": 2,
+        "hash": "d9f9bc7fdae7724ebb1e5ae73b9fa6c9b72c21357c5363cd8ae81c737c84fe17",
         "has_changes": true,
         "ctime": "2026-11-04 22:17:55",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/common/ansi_esc.py": {
         "build": 1,
@@ -172,11 +172,11 @@
         "mtime": "2026-11-04 22:17:55"
     },
     "lib/uart/uart_link.py": {
-        "build": 1,
-        "hash": "2daef0ac98f51ea22b1a2e5cc4f44dc979864fda4b2fb13205e248167a74b678",
+        "build": 2,
+        "hash": "9354ff44d1ab3761954bd0905a1aeac27059d64b85ea6530fb378542ba3df574",
         "has_changes": true,
         "ctime": "2026-11-04 22:17:55",
-        "mtime": "2026-11-04 22:17:55"
+        "mtime": "2026-11-06 10:29:20"
     },
     "lib/common/helpers.py": {
         "build": 1,
@@ -191,5 +191,12 @@
         "has_changes": true,
         "ctime": "2026-11-06 09:01:33",
         "mtime": "2026-11-06 09:08:38"
+    },
+    "src/task_register.py": {
+        "build": 1,
+        "hash": "2966e97cf35d834f8f5ac2d5c1e9254a65dd237655b254ebdc2ee8cebfcf82b9",
+        "has_changes": true,
+        "ctime": "2026-11-06 10:29:20",
+        "mtime": "2026-11-06 10:29:20"
     }
 }
