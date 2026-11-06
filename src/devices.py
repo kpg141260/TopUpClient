@@ -1,5 +1,5 @@
-__VERSION__ = "0.6.0.6"
-# ruff: noqa: RUF100, UP025, UP004, I001, F401
+__VERSION__ = "0.6.0.7"
+# ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import onewire, ds18x20, time        # type: ignore
 from   machine     import Pin, Timer # type: ignore
