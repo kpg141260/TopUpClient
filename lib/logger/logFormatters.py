@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.26"
+__VERSION__ = "0.6.0.27"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, S110
 # -*- coding: utf-8 -*-
 import time
@@ -78,7 +78,7 @@ class LogFormatter:
                  use_ampm: bool | None=None,
                  use_ts: bool | None=None,
                  use_pad: bool | None=None,
-                 align: str='center',
+                 align: str | None=None,
                  name=''):
         self._txt_dm        = ' \x1b[0m sub-dictionary missing'
         self._name          = name
@@ -106,9 +106,16 @@ class LogFormatter:
         self.rxf          = regex_filters
         self.rxf.init_cache (self._filters)
 
-        self._evt_fmt_lbls = config['evt_tag_map'].copy()
+        evt_format = self._log_fmt.get('evt_format')
+        if evt_format is None:
+            self._evt_fmt_lbls = self._log_fmt['evt_labels'][:]
+        else:
+            if not isinstance(evt_format, str):
+                raise TypeError('logFormat.evt_format must be a string')
+            if evt_format.count('%') % 2:
+                raise ValueError('logFormat.evt_format contains an unclosed field')
+            self._evt_fmt_lbls = evt_format.split('%')[1::2]
 
-        # Note: flags defined in config are overwritten and must be passed explicitly in the constructor
         self._use_col   = use_color if use_color is not None else self._orig_cfg['logFormat'].get('use_color', False)
         self._use_eid   = use_eid   if use_eid   is not None else self._orig_cfg['logFormat'].get('use_eid',   False)
         self._use_ampm  = use_ampm  if use_ampm  is not None else self._orig_cfg['logFormat'].get('use_ampm',  False)
@@ -188,8 +195,8 @@ class LogFormatter:
             if val in ('', None):
                 continue
 
-            # Special handling for 'msg' field with colorization
-            if k == 'msg' and self._use_col:
+            # Apply inline tag layout in either color mode.
+            if k == 'msg':
                 val = event.get('msg', '')
                 if val in ('', None):
                     continue
@@ -212,10 +219,6 @@ class LogFormatter:
             else:
                 part = str(val)
 
-            parts.append(part)
-
-        # Post-process parts in-place to avoid extra lists/dicts
-        for idx, part in enumerate(parts):
             p = part
             if ('\x1b' in p or '\u001b' in p) and not self._use_col:
                 p = self.strip_esc_seq(p)
@@ -223,16 +226,15 @@ class LogFormatter:
             if not self._use_brkts:
                 p = self.strip_brackets(p, self._filters.get('brackets', '[]<>{}()'))
             p = self.strip_spaces(p)
-
-            parts[idx] = p
+            if k == 'lbl' and self._use_pad:
+                for level, info in self._orig_cfg['dbg_lvl_map'].items():
+                    if info[1] == val:
+                        p = p.replace(val, self._log_lbls[level])
+                        break
+            parts.append(p)
 
         result = sep.join(parts)
 
-        if self._use_pad:
-            for k, v in self._orig_cfg['dbg_lvl_map'].items():
-                if v[1] in result:
-                    result = result.replace(v[1], self._log_lbls[k])
-                    break
         # attempt to reduce fragmentation immediately
         gc.collect()
         return result
@@ -331,6 +333,7 @@ class LogFormatter:
         gc.collect()
         return msg
     def _pre_process_event ( self, event_log: dict):
+        event_log = event_log.copy()
         # Reset base color and label color
         # EVENT TAG STRUCTURE: [0]=short-tag, [1]=prefix, [2]=suffix, [3]=color
         self._evt_tag_map['lbl'][3] = ''
@@ -345,8 +348,6 @@ class LogFormatter:
             # No colorization
             self._base_col = ''
             self._accent   = ''
-            # Strip any tags from the event message
-            event_log['msg'] = self.strip_tags (event_log.get('msg', ''))
         # Set label and message colors
         self._evt_tag_map['lbl'][3] = self._base_col
         self._evt_tag_map['msg'][3] = self._base_col
@@ -374,19 +375,14 @@ class LogFormatter:
         event_log['ts'] = ts
 
         if self._show_mem:
-            mem_info = f' [{gc.mem_free()} bytes free]'
-            if self._use_col:
-                mem_info = f' {self._evt_tag_map['mem'][3]}{mem_info}{self._log_col.get("end", "")}'
-            event_log['mem'] = mem_info
+            event_log['mem'] = f'[{gc.mem_free()} bytes free]'
+        else:
+            event_log['mem'] = ''
 
         for key in list(event_log.keys()):
             # Remove any keys not in the event format fields, except for 'lvl'
             if key not in self._evt_fmt_lbls and key != 'lvl':
                 del event_log[key]
-            else:
-                if  event_log[key] is not None and isinstance (event_log[key], str):
-                    # Remove any leading/trailing brackets
-                    event_log[key] = self.strip_brackets (event_log[key], self._filters['brackets'])
         return event_log
     def _colorize(self, text):
         """
@@ -421,13 +417,13 @@ class LogFormatter:
                 short_tag = tag_info[0] if len(tag_info) > 0 else ''  # noqa: F841
                 prefix    = tag_info[1] if len(tag_info) > 1 else ''
                 suffix    = tag_info[2] if len(tag_info) > 2 else ''
-                color     = tag_info[3] if len(tag_info) > 3 else ''
+                color     = tag_info[3] if self._use_col and len(tag_info) > 3 else ''
 
                 if self._use_brkts:
                     # include color (if any), then bracketed prefix/content/suffix, then reset to base color
                     repl = f'{color}{prefix}{inner}{suffix}{self._base_col}'
                 else:
-                    repl = f'{color}{prefix}{inner}{suffix}{self._base_col}'
+                    repl = f'{color}{inner}{self._base_col}'
 
                 # Replace the whole $tag$inner$tag$ with the replacement
                 text = text[:i] + repl + text[j + len(open_pat):]

@@ -1,5 +1,7 @@
 ## 2026-11-06
 
+* Restored configured logger field order and selection in `lib/logger/logFormatters.py` using `logFormat.evt_format`, with `evt_labels` as a fallback. Restored event isolation and consistent bracket/padding/alignment behavior across color modes. Exact-output and multi-handler regression tests for both peers are in TopUpServer `tests/log_formatter_test.py`.
+
 * Switched `lib/uart/uart_full_duplex.py` to native UART RTS/CTS flow control and removed manual RTS writes. Finite receive-capacity burst tests for both peers are in TopUpServer `tests/test_uart_frames.py`; wiring and pin ownership are documented in TopUpServer `docs/uart_protocol.md`. Physical RTC synchronization remains unverified.
 
 * Fixed UART byte loss in `lib/uart/uart_full_duplex.py`: receive reads are bounded by ring capacity, and unaccepted writes retain their bytes for retry. Shared regression coverage is in TopUpServer `tests/test_uart_frames.py`. Physical RTC synchronization still requires device verification.
