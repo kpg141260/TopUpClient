@@ -121,7 +121,7 @@ class LogFormatter:
         self._align = self._align if self._align in ('left', 'l', 'right', 'r', 'center', 'c') else 'center'
 
         # Set up color scheme if requested
-        if use_color:
+        if self._use_col:
             self._log_col  = config['logColors'].copy()
             # Set default colors if not provided
             self._base_col = self._log_col.get  ('off', "\u001b[38;5;8m")
@@ -172,7 +172,9 @@ class LogFormatter:
             Updated to minimize temporary allocations and call gc.collect() to free fragmentation. """
         if not isinstance(event_log, (dict, str)):
             raise TypeError(f'{__class__.__name__} event_log must be a \'dictionary\' or \'string\'')
-        if isinstance(event_log, str) or not any(k in event_log for k in self._evt_tag_map):
+        if isinstance(event_log, str):
+            return event_log if self._use_col else self.strip_esc_seq(event_log)
+        if not any(k in event_log for k in self._evt_tag_map):
             return event_log
 
         event = self._pre_process_event(event_log)

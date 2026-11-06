@@ -149,6 +149,7 @@ def init_logger (config) -> Logger:
             if enable.get('console', False) or enable.get('file', False):
                 lfnc = LogFormatter(
                     config = log_config,
+                    use_color = False,
                     name    = 'lfnc'
                 )
             lfc = LogFormatter(
