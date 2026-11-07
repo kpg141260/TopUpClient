@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.14"
+__VERSION__ = "0.6.0.15"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, UP041, BLE001, S110
 # -*- coding: utf-8 -*-
 try:
@@ -198,7 +198,7 @@ class AsyncHandlers:
                         if isinstance(event, dict) and event !={}:
                             if 'uart_tx' in event:
                                 data = event.pop('uart_tx')
-                                event['lvl'] = self.dbg_lvls.OFF
+                                event['lvl'] = self.dbg_lvls.DEBUG
                                 event['msg'] = f'{self._tc.info}Writing: {self._tc.par}{data}{self._tc.end}'
                             elif 'uart_rx_error' in event:
                                 data = event.pop('uart_rx_error')
