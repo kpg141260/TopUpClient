@@ -74,11 +74,11 @@ class LogFormatter:
                  config: dict,
                  use_color: bool | None=None,
                  use_brkts: bool | None=None,
-                 use_eid: bool | None=None,
-                 use_ampm: bool | None=None,
-                 use_ts: bool | None=None,
-                 use_pad: bool | None=None,
-                 align: str | None=None,
+                 use_eid:   bool | None=None,
+                 use_ampm:  bool | None=None,
+                 use_ts:    bool | None=None,
+                 use_pad:   bool | None=None,
+                 align:      str | None=None,
                  name=''):
         self._txt_dm        = ' \x1b[0m sub-dictionary missing'
         self._name          = name
