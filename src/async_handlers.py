@@ -257,7 +257,7 @@ class AsyncHandlers:
         gc.collect()
         try:
             while True:
-                if self._uart.is_connected and self._uart.cts and task_register['as_tank_check']['state'] not in (self.as_state.PAUSED, self.as_state.STOPPED):
+                if self._uart.is_connected and self._uart.can_send and task_register['as_tank_check']['state'] not in (self.as_state.PAUSED, self.as_state.STOPPED):
                     self.state['sys']['client']['c_tmp'] = self._helpers.get_core_temp()
                     self.state['sys']['client']['mem_f'] = gc.mem_free()  # type: ignore
                     self.state['sys']['client']['mem_a'] = gc.mem_alloc() # type: ignore
@@ -281,7 +281,7 @@ class AsyncHandlers:
                 if task_register[name]['state'] != self.as_state.PAUSED:
                     self.task_manager.task_status_all (failed_only = True)
                     val = f'{self._tc.info}{self.s2t[self.as_state.RUNNING]}{self._tc.end}' if not self._uart.thread_is_paused else f'{self._tc.waiting}{self.s2t[self.as_state.PAUSED]}{self._tc.end}'
-                    self._log.debug ({'msg': f'$v$Core 2 thread$v$ {val}'})
+                    self._log.debug ({'msg': f'$v$Core 1 thread$v$ {val}'})
                     if self.task_manager.get_failed_task_count () > 3: 
                         # There is a major problem if there are more than 3 failed tasks
                         self.stop (exc=True)
