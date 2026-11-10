@@ -104,9 +104,17 @@ class UARTEventTests(unittest.TestCase):
         self.assertEqual(self.events[0], {'uart_tx': b'GHAB'})
         self.assertEqual(b''.join(call.args[0] for call in hardware.write.call_args_list), b'GHAB')
         driver.tx_buffer[:] = b'........'
+        self.events.put({'msg': 'Later UART error', 'lvl': LEVELS.ERROR})
         self.consume()
-        self.log.aprint.assert_called_once_with("<info>Writing: <data>b'GHAB'<end>")
-        self.log.get_time_stamp.assert_called_once_with()
+        self.log.debug.assert_called_once_with({
+            'msg': "<info>Writing: <data>b'GHAB'<end>",
+            'lvl': LEVELS.DEBUG, 'ts': 'Core 0 timestamp',
+        })
+        self.log.aprint.assert_not_called()
+        self.log.error.assert_called_once_with({
+            'msg': 'Later UART error', 'lvl': LEVELS.ERROR, 'ts': 'Core 0 timestamp',
+        })
+        self.assertFalse(self.events)
 
     def test_paused_consumer_keeps_events_queued(self):
         event = {'msg': 'UART active', 'lvl': LEVELS.INFO}

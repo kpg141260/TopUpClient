@@ -1,3 +1,7 @@
+## 2026-11-07
+
+* Fixed `src/async_handlers.py` marking UART transmit snapshots as OFF, which terminated the event consumer. Snapshots now use DEBUG while CRC errors retain ERROR. Updated `tests/test_uart_events.py` to verify debug output and delivery of a later error. Applied to both peers; physical RTC corruption remains under investigation.
+
 ## 2026-11-06
 
 * Restored configured logger field order and selection in `lib/logger/logFormatters.py` using `logFormat.evt_format`, with `evt_labels` as a fallback. Restored event isolation and consistent bracket/padding/alignment behavior across color modes. Exact-output and multi-handler regression tests for both peers are in TopUpServer `tests/log_formatter_test.py`.
