@@ -1,4 +1,4 @@
-__VERSION__ = "0.6.0.12"
+__VERSION__ = "0.6.0.13"
 # ruff: noqa: RUF100, UP025, UP004, I001, F401, BLE001, B012, S110
 # -*- coding: utf-8 -*-
 import  gc
@@ -45,7 +45,7 @@ class UARTComms (UARTHelpersClient):
             self._ext_build = 'na' # build number of the server/external device
             self._ev_buffer = event_buffer
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_construct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
-            self._dvc_cnctd:        bool = False
+            self._peer_cnctd:        bool = False
             self._thread_running:   bool = False
             self._hs_active:        bool = False
             self._hs_paused:        bool = False
@@ -78,7 +78,7 @@ class UARTComms (UARTHelpersClient):
         try:
             self._log.debug ({'msg': f'$p${__VERSION__}$p$ $a${self._txt_destruct} {self._txt_launch}$a$', 'cls': __class__, 'acc': self._tc.waiting})
             super().destructor()
-            self._dvc_cnctd = False
+            self._peer_cnctd = False
             self._ext_name = None
             self._ext_ver = None
             self._encoding = None
@@ -122,7 +122,7 @@ class UARTComms (UARTHelpersClient):
                 try:
                     gc.collect()
                     _thread.start_new_thread (entry, ())
-                    self._dvc_cnctd = False
+                    self._peer_cnctd = False
                     self._time_synchronised = False
                     return
                 except OSError as ex:
@@ -218,9 +218,9 @@ class UARTComms (UARTHelpersClient):
 
 ########## COMMUNICATION HELPER METHODS ##########
     def _link_changed(self):
-        self._dvc_cnctd = self._link.is_connected
+        self._peer_cnctd = self._link.is_connected
         self._hs_active = self._link.state == 'handshaking'
-        if not self._dvc_cnctd:
+        if not self._peer_cnctd:
             self._rtc.reset()
             self._sync_active = False
             self._time_synchronised = False
@@ -277,7 +277,7 @@ class UARTComms (UARTHelpersClient):
         val += f'{tc.info} - synchronised{tc.end}' if self._time_synchronised else f'{tc.warning} - not synchronised{tc.end}'
         uart_stats.append (f'{self._tc.par}RTC sync:\t{val}')
 
-        val = f'{tc.info}connected{tc.end}' if self._dvc_cnctd else f'{tc.critical}not connected{tc.end}'
+        val = f'{tc.info}connected{tc.end}' if self._peer_cnctd else f'{tc.critical}not connected{tc.end}'
         uart_stats.append (f'{self._tc.par}Device:\t\t{val}')
 
         uart_stats.append (f'{self._tc.par}EV buf used:\t{tc.success}{self._ev_buffer.size()}{tc.end}')
@@ -348,7 +348,7 @@ class UARTComms (UARTHelpersClient):
     # Retrieve the device connection status
     @property
     def is_connected ( self ):
-        return self._dvc_cnctd
+        return self._peer_cnctd
 
     def connected ( self, value: bool ):
         if not value:
